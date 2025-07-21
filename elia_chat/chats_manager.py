@@ -115,10 +115,35 @@ class ChatsManager:
 
     @staticmethod
     async def add_message_to_chat(chat_id: int, message: ChatMessage) -> None:
+        """
+        DEPRECATED: For traditional message persistence only.
+        
+        New Claude Code sessions use atomic stream coordination via sync.stream_coordinator
+        which handles immediate database registration without this method.
+        """
         async with get_session() as session:
             chat: ChatDao | None = await session.get(ChatDao, chat_id)
             if not chat:
                 raise Exception(f"Chat with ID {chat_id} not found.")
+            
+            # Validation: ensure message has meaningful content
+            message_content = message.message.get("content", "")
+            if not message_content or message_content.strip() == "":
+                from logging import getLogger
+                logger = getLogger(__name__)
+                logger.warning(f"Message for chat {chat_id} has empty content: {message.message}")
+                # Don't save empty messages
+                return
+            
+            # Additional validation for assistant messages
+            if message.message.get("role") == "assistant":
+                # Check if content looks truncated or incomplete
+                if len(message_content) < 50 and not any(marker in message_content.lower() 
+                                                      for marker in ["error", "failed", "unable"]):
+                    from logging import getLogger
+                    logger = getLogger(__name__)
+                    logger.warning(f"Assistant message seems incomplete (only {len(message_content)} chars): {message_content[:100]}...")
+            
             message_dao = chat_message_to_message_dao(message, chat_id)
             (await chat.awaitable_attrs.messages).append(message_dao)
             session.add(chat)

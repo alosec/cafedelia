@@ -151,9 +151,11 @@ class Chat(Widget):
         self.scroll_to_latest_message()
         self.post_message(self.NewUserMessage(content))
 
-        await ChatsManager.add_message_to_chat(
-            chat_id=self.chat_data.id, message=user_chat_message
-        )
+        # DEPRECATED: Message persistence now handled by stream coordinator for Claude Code sessions
+        if not self._is_claude_code_session():
+            await ChatsManager.add_message_to_chat(
+                chat_id=self.chat_data.id, message=user_chat_message
+            )
 
         prompt = self.query_one(ChatPromptInput)
         prompt.submit_ready = False
@@ -274,12 +276,19 @@ class Chat(Widget):
 
     @on(AgentResponseComplete)
     def agent_finished_responding(self, event: AgentResponseComplete) -> None:
-        # Ensure the thread is updated with the message from the agent
-        self.chat_data.messages.append(event.message)
-        event.chatbox.border_title = "Agent"
-        event.chatbox.remove_class("response-in-progress")
+        # Handle individual message completion (new multi-message approach)
+        if event.message:
+            self.chat_data.messages.append(event.message)
+        
+        if event.chatbox:
+            event.chatbox.border_title = "Claude Code"
+            event.chatbox.remove_class("response-in-progress")
+        
+        # Only enable prompt after the final message (not for each individual message)
+        # This will be handled by the stream completion logic instead
         prompt = self.query_one(ChatPromptInput)
-        prompt.submit_ready = True
+        if not hasattr(self, '_stream_in_progress') or not self._stream_in_progress:
+            prompt.submit_ready = True
 
     @on(PromptInput.PromptSubmitted)
     async def user_chat_message_submitted(
@@ -395,17 +404,46 @@ class Chat(Widget):
         # If no session ID found, this might be a new session
         return str(self.chat_data.id) if self.chat_data.id else "new"
     
+    def _get_message_classes(self, message_dao) -> str:
+        """Get appropriate CSS classes for a message based on its properties."""
+        classes = []
+        
+        # Base message type styling
+        if message_dao.message_type == "user":
+            classes.append("user-message")
+        elif message_dao.message_type == "assistant":
+            classes.append("assistant-message")
+        elif message_dao.message_type == "system":
+            classes.append("system-message")
+        elif message_dao.message_type == "result":
+            classes.append("result-message")
+        
+        # Sidechain styling
+        if message_dao.is_sidechain:
+            classes.append("sidechain-message")
+            if message_dao.message_source:
+                classes.append(f"sidechain-{message_dao.message_source}")
+        
+        # Tool message styling
+        if (hasattr(message_dao, 'message_metadata') and 
+            message_dao.message_metadata and 
+            message_dao.message_metadata.get('tool_name')):
+            classes.append("tool-message")
+        
+        return " ".join(classes)
+    
     async def _stream_claude_code_response(self) -> None:
-        """Handle streaming response from Claude Code SDK."""
+        """Handle streaming response using intelligent state management."""
         try:
             from sync.claude_process import session_manager
-            from sync.streaming_message_grouper import StreamingMessageGrouper
+            from sync.session_state_manager import session_state_manager
+            from pathlib import Path
             
             # Get session ID and determine if we should resume
             session_id = self._extract_claude_session_id()
             should_resume = session_id != "new" and session_id != str(self.chat_data.id)
             
-            log.debug(f"Streaming Claude Code response for session: {session_id} (resume: {should_resume})")
+            log.debug(f"Starting intelligent Claude Code stream for session: {session_id} (resume: {should_resume})")
             
             # Get the last user message
             user_message = self.chat_data.messages[-1].message.get("content", "")
@@ -415,7 +453,7 @@ class Chat(Widget):
                 return
             
             # Get or create session with current project path
-            project_path = str(Path.cwd())  # Use current directory as project path
+            project_path = str(Path.cwd())
             model_choice = None
             if hasattr(self.model, 'cli_model'):
                 model_choice = self.model.cli_model
@@ -430,146 +468,144 @@ class Chat(Widget):
             if actual_session_id:
                 self.post_message(self.SessionIdCaptured(actual_session_id))
             
-            # Create response message
-            ai_message: ChatCompletionAssistantMessageParam = {
-                "content": "",
-                "role": "assistant",
-            }
-            now = datetime.datetime.now(datetime.timezone.utc)
+            # Register session with state manager
+            jsonl_path = Path.home() / ".claude" / "projects" / f"-home-alex-code-cafedelia" / f"{actual_session_id}.jsonl"
+            session_state = await session_state_manager.register_session(actual_session_id, jsonl_path)
             
-            message = ChatMessage(message=ai_message, model=self.model, timestamp=now)
-            response_chatbox = Chatbox(
-                message=message,
-                model=self.chat_data.model,
-                classes="response-in-progress",
-            )
+            # Track mounted chatboxes for this session
+            session_chatboxes = []
+            
+            # Register state management event handlers  
+            def on_ui_update_required(event):
+                """Handle UI update events - create and mount individual Chatbox widgets."""
+                if event.data.get('action') == 'add_message':
+                    message_dao = event.data['message_dao']
+                    try:
+                        # Convert to ChatMessage format using existing converter
+                        from elia_chat.database.converters import message_dao_to_chat_message
+                        from elia_chat.models import get_model
+                        
+                        # Get model for conversion
+                        model = get_model(message_dao.model or "claude-code")
+                        chat_message = message_dao_to_chat_message(message_dao, model.lookup_key)
+                        
+                        # Create Chatbox using the battle-tested pattern
+                        chatbox = Chatbox(
+                            message=chat_message,
+                            model=model,
+                            classes=self._get_message_classes(message_dao)
+                        )
+                        
+                        # Mount the chatbox using the proven pattern
+                        self.app.call_from_thread(self.chat_container.mount, chatbox)
+                        session_chatboxes.append(chatbox)
+                        
+                        # Emit individual AgentResponseComplete for this message
+                        self.post_message(self.AgentResponseComplete(
+                            chat_id=self.chat_data.id,
+                            message=chat_message,
+                            chatbox=chatbox,
+                        ))
+                        
+                        log.debug(f"Mounted Chatbox for message {message_dao.id}")
+                        
+                    except Exception as e:
+                        log.error(f"Failed to create Chatbox for message {message_dao.id}: {e}")
+            
+            def on_parity_issue(event):
+                """Handle parity issues from state manager."""
+                log.warning(f"Parity issue detected: {event.data}")
+                # Optionally trigger automatic correction
+                if session_state_manager.auto_correction_enabled:
+                    asyncio.create_task(
+                        session_state_manager.correct_parity_issues(actual_session_id)
+                    )
+            
+            def on_state_error(event):
+                """Handle state management errors."""
+                log.error(f"State management error: {event.data}")
+            
+            # Register event handlers
+            session_state_manager.add_event_handler('ui_update_required', on_ui_update_required)
+            session_state_manager.add_event_handler('parity_issue', on_parity_issue)
+            session_state_manager.add_event_handler('error', on_state_error)
+            
+            # Track streaming state
+            self._stream_in_progress = True
             self.post_message(self.AgentResponseStarted())
-            self.app.call_from_thread(self.chat_container.mount, response_chatbox)
             
-            # Initialize streaming message grouper for coherent UX
-            grouper = StreamingMessageGrouper()
-            response_content = ""
-            message_count = 0
-            
-            # Extract model selection from chat model
-            model_choice = None
-            if hasattr(self.model, 'cli_model'):
-                model_choice = self.model.cli_model
-                log.debug(f"Using Claude Code model: {model_choice}")
-            
+            # Stream Claude Code responses with state management
             async for claude_response in session_manager.send_message(
                 actual_session_id, 
                 user_message, 
                 resume=should_resume,
                 model=model_choice
             ):
-                message_count += 1
-                
-                # Handle system messages immediately
-                if claude_response.message_type == "system":
-                    if "Session initialized" in claude_response.content:
-                        response_chatbox.border_title = "Claude Code initializing..."
-                        # Update session ID from system message
-                        actual_session_id = claude_response.session_id
+                try:
+                    # Process each response through state manager
+                    if claude_response.raw_json:
+                        state_event = await session_state_manager.process_new_message(
+                            actual_session_id, 
+                            claude_response.raw_json
+                        )
                         
-                        # Emit updated session ID
-                        if actual_session_id:
-                            self.post_message(self.SessionIdCaptured(actual_session_id))
-                    continue
-                
-                # Process response through grouper for coherent display
-                grouped_message = grouper.add_response(claude_response)
-                
-                if grouped_message:
-                    # Complete grouped message ready for display
-                    if grouped_message.message_type == "system":
-                        # System messages display immediately
-                        self.app.call_from_thread(
-                            response_chatbox.set_grouped_content, 
-                            grouped_message.content, 
-                            grouped_message.metadata
-                        )
+                        if state_event:
+                            log.debug(f"Processed message via state manager: {state_event.event_type}")
+                        else:
+                            log.warning("State manager failed to process message")
+                    else:
+                        log.warning("Claude response missing raw_json")
                     
-                    elif grouped_message.message_type == "assistant":
-                        # Grouped assistant content with tool calls/results
-                        response_chatbox.border_title = "Claude Code"
-                        self.app.call_from_thread(
-                            response_chatbox.set_grouped_content,
-                            grouped_message.content,
-                            grouped_message.metadata
-                        )
-                        response_content = grouped_message.content
-                    
-                    elif grouped_message.message_type == "result":
-                        # Final result message - log completion and break
-                        metadata = grouped_message.metadata
-                        if metadata.get('total_cost_usd'):
+                    # Handle completion
+                    if claude_response.message_type == "result" and claude_response.is_complete:
+                        # Log completion details
+                        if claude_response.metadata.get('total_cost_usd'):
                             log.info(f"Claude Code session {actual_session_id} completed. "
-                                   f"Cost: ${metadata['total_cost_usd']:.4f}, "
-                                   f"Turns: {metadata.get('num_turns', 0)}, "
-                                   f"Duration: {metadata.get('duration_ms', 0)}ms")
+                                   f"Cost: ${claude_response.metadata['total_cost_usd']:.4f}, "
+                                   f"Turns: {claude_response.metadata.get('num_turns', 0)}, "
+                                   f"Duration: {claude_response.metadata.get('duration_ms', 0)}ms")
+                        
+                        # Mark final chatbox as complete if we have any
+                        if session_chatboxes:
+                            final_chatbox = session_chatboxes[-1]
+                            final_chatbox.remove_class("response-in-progress")
+                            final_chatbox.add_class("response-complete")
+                        break
+                    
+                    elif claude_response.message_type == "error":
+                        # Handle errors
+                        log.error(f"Claude Code error: {claude_response.content}")
                         break
                 
-                else:
-                    # Still building group - update status
-                    if claude_response.message_type == "assistant":
-                        response_chatbox.border_title = "Claude Code is responding..."
-                    elif claude_response.message_type == "result":
-                        response_chatbox.border_title = "Claude Code processing..."
-                
-                # Handle completion and errors
-                if claude_response.message_type == "result" and claude_response.is_complete:
-                    # Force complete any remaining group
-                    final_group = grouper.force_complete_group()
-                    if final_group:
-                        self.app.call_from_thread(
-                            response_chatbox.set_grouped_content,
-                            final_group.content,
-                            final_group.metadata
-                        )
-                        response_content = final_group.content
-                    break
-                
-                elif claude_response.message_type == "error":
-                    # Handle errors immediately
-                    response_chatbox.border_title = "Claude Code Error"
-                    self.app.call_from_thread(
-                        response_chatbox.set_grouped_content, claude_response.content
-                    )
-                    break
-                
-                # Auto-scroll for all message types
-                scroll_y = self.chat_container.scroll_y
-                max_scroll_y = self.chat_container.max_scroll_y
-                if scroll_y in range(max_scroll_y - 3, max_scroll_y + 1):
-                    self.app.call_from_thread(
-                        self.chat_container.scroll_end, animate=False
-                    )
+                except Exception as e:
+                    log.error(f"Error processing Claude response: {e}")
+                    continue
             
             # Update chat data with session ID for future reference
             if actual_session_id:
                 self.chat_data.session_id = actual_session_id
-                # Emit the updated session ID for persistence
                 self.post_message(self.SessionIdCaptured(actual_session_id))
             
-            # Ensure the message content is updated with final response
-            if response_content:
-                response_chatbox.message.message["content"] = response_content
+            # Cleanup event handlers
+            session_state_manager.remove_event_handler('ui_update_required', on_ui_update_required)
+            session_state_manager.remove_event_handler('parity_issue', on_parity_issue)
+            session_state_manager.remove_event_handler('error', on_state_error)
             
-            # Mark as complete
-            self.post_message(
-                self.AgentResponseComplete(
-                    chat_id=self.chat_data.id,
-                    message=response_chatbox.message,
-                    chatbox=response_chatbox,
-                )
-            )
+            # Mark streaming as complete
+            self._stream_in_progress = False
+            
+            # Enable prompt for new messages
+            prompt = self.query_one(ChatPromptInput)
+            prompt.submit_ready = True
+            
+            # Auto-scroll to show latest messages
+            self.chat_container.scroll_end(animate=False)
             
         except Exception as e:
-            log.error(f"Error in Claude Code SDK streaming: {e}")
+            log.error(f"Error in intelligent Claude Code streaming: {e}")
             self.app.notify(
-                f"Claude Code SDK error: {e}",
-                title="Claude Code Error",
+                f"Claude Code streaming error: {e}",
+                title="Claude Code Error", 
                 severity="error",
                 timeout=constants.ERROR_NOTIFY_TIMEOUT_SECS,
             )

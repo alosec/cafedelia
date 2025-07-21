@@ -19,6 +19,7 @@ from textual.document._syntax_aware_document import SyntaxAwareDocumentError
 
 from elia_chat.config import EliaChatModel
 from elia_chat.models import ChatMessage
+from elia_chat.widgets.message_types import create_message_widget
 
 
 class SelectionTextArea(TextArea):
@@ -360,6 +361,13 @@ class Chatbox(Widget, can_focus=True):
             # so we do not need to render anything.
             return ""
 
+        # Try to create a specialized message widget
+        specialized_widget = create_message_widget(self.message)
+        if specialized_widget:
+            # Use the specialized widget's render method
+            return specialized_widget.render()
+
+        # Fallback to default rendering
         message = self.message.message
         theme = self.app.theme_object
         if theme:
