@@ -1,28 +1,28 @@
 # Active Context
 
 ## Current State  
-- **Date**: July 20, 2025
-- **Focus**: Cafedelia Setup - Memory Bank Creation and Architecture Foundation
-- **Status**: Project initialization complete, beginning implementation planning
+- **Date**: July 21, 2025
+- **Focus**: Claude Code GUI Wrapper Development 
+- **Status**: Standalone Cafedelia complete, focusing on Claude Code integration
 
 ## Cafedelia Fork Strategy (July 20, 2025)
 
-### Strategic Decision: Fork Elia Instead of Building from Scratch
-**Rationale**: Leverage proven Textual UI framework and configuration system while adding CLI provider capabilities
+### Strategic Decision: Focus Exclusively on Claude Code
+**Rationale**: Build the GUI that Claude Code should have had from the beginning - complete session management and intelligence
 
-**What We Get Free**:
+**What We Get Free from Elia**:
 - Beautiful, functional Textual interface
-- Robust model/provider configuration system  
-- SQLite persistence and chat history
+- Robust configuration system for models
+- SQLite persistence for session tracking
 - Professional screen management and navigation
 - Theme system and customization
-- TOML configuration patterns
 
-**What We Add**:
-- CLI provider support alongside API providers
-- Claude Code session discovery and management
-- Tmux integration for terminal session embedding
-- Background session monitoring with intelligence layer
+**What We Add for Claude Code**:
+- Visual session browser and management
+- Claude Code session discovery from filesystem
+- Tmux integration for session embedding
+- Session intelligence and progress monitoring
+- Model configuration GUI for Claude Code's available models
 
 ### Fork Analysis Complete
 **Elia Architecture Assessment**: ✅
@@ -32,20 +32,20 @@
 - `database/`: SQLite patterns ready for session management
 
 ### Implementation Approach Defined
-**Phase 1**: Provider Type Separation in OptionsModal
-- Extend UI to distinguish "API Providers" vs "CLI Providers"  
-- Modify EliaChatModel to support provider_type field
-- Add Claude Code as first CLI provider definition
+**Phase 1**: Claude Code Model Configuration
+- Configure available Claude Code models in Elia's model system
+- Replace API provider models with Claude Code model selection
+- Create GUI for Claude Code model configuration
 
-**Phase 2**: CLI Provider Architecture
-- Create TmuxSession widget to replace Chat widget for CLI providers
-- Implement Claude Code session discovery from filesystem
+**Phase 2**: Session Discovery and Management
+- Implement Claude Code session discovery from `~/.claude/__store.db`
+- Create visual session browser in main interface
 - Add session creation/attachment logic with tmux integration
 
-**Phase 3**: Session Intelligence Layer
-- Background session monitoring
-- `claude -p` integration for session summaries
-- Cross-session coordination capabilities
+**Phase 3**: Session Intelligence and Monitoring
+- Background session progress monitoring
+- Session status and health indicators
+- Project-based session organization
 
 ## Current Development Focus
 
@@ -57,40 +57,41 @@
 - [ ] Technical context for development setup
 - [ ] Progress tracking for implementation phases
 
-### Next Development Phase: Provider Type Implementation
-**Target**: Extend Elia's OptionsModal for API vs CLI provider selection
+### Next Development Phase: Claude Code Model Integration
+**Target**: Configure Claude Code models as primary interface
 
 ```python
-# Current Elia: Single model selection
+# Current Elia: General LLM model selection
 with RadioSet(id="available-models"):
-    # All models listed together
+    # OpenAI, Anthropic, Google models
 
-# Cafedelia: Provider type separation  
-with RadioSet(id="provider-types"):
-    ○ API Providers    # OpenAI, Anthropic, Google
-    ● CLI Providers    # Claude Code, future tools
+# Cafedelia: Claude Code models from configuration
+with RadioSet(id="claude-code-models"):
+    ○ Claude 3.5 Sonnet (Latest)
+    ● Claude 3.5 Haiku (Fast) 
+    ○ Claude 3 Opus (Most Capable)
 ```
 
 ### Technical Roadmap Priorities
-1. **Provider Architecture** (Week 1)
-   - Extend EliaChatModel with provider_type field
-   - Modify OptionsModal for provider type selection
-   - Define Claude Code CLI provider configuration
+1. **Claude Code Model Configuration** (Week 1)
+   - Configure Claude Code models in EliaChatModel system
+   - Replace default models with Claude Code model selection
+   - Create model configuration GUI for Claude Code settings
 
-2. **Session Discovery** (Week 2)
-   - Implement Claude Code session filesystem scanning
-   - Parse session metadata and status
-   - Create session selection interface
+2. **Session Discovery** (Week 2)  
+   - Implement Claude Code session discovery from `~/.claude/__store.db`
+   - Parse session metadata and sync to Cafedelia database
+   - Create visual session browser interface
 
-3. **Tmux Integration** (Week 3)
-   - Build TmuxSession widget for CLI providers
-   - Handle session creation/attachment logic
-   - Embed tmux sessions in Textual interface
+3. **Session Management** (Week 3)
+   - Build session attachment and creation logic
+   - Implement tmux integration for session display
+   - Add session status monitoring and health checks
 
-4. **Intelligence Layer** (Week 4+)
-   - Background session monitoring
-   - `claude -p` summarization integration
-   - Cross-session coordination features
+4. **Session Intelligence** (Week 4+)
+   - Background session progress monitoring
+   - Session summaries and achievement tracking
+   - Project-based session organization
 
 ## Technical Context
 

@@ -1,56 +1,57 @@
 # Cafedelia Project Brief
 
 ## Project Name
-Cafedelia - Elia Fork with Claude Code CLI Provider Integration
+Cafedelia - The Terminal GUI for Claude Code
 
 ## Vision
-Transform Elia from a beautiful terminal chat wrapper into a comprehensive AI session management platform by adding CLI provider support, with Claude Code as the flagship integration. Cafedelia bridges the gap between polished terminal UIs and serious AI workflow orchestration.
+Transform Elia's beautiful Textual interface into a comprehensive GUI wrapper for Claude Code session management. Cafedelia provides the visual interface and session intelligence that Claude Code should have had from the beginning.
 
 ## Core Problem
-Existing terminal LLM tools fall into two limited categories:
-1. **Chat Wrappers** (Elia, basic terminal clients): Beautiful interfaces but no workflow capabilities
-2. **Workflow Tools** (Claude Code, Aider): Powerful agents but primitive session management
+Claude Code is incredibly powerful but lacks proper session management:
+1. **No Session Visibility**: Can't see what sessions exist or their status
+2. **Primitive CLI Interface**: Manual session ID management with `--resume` 
+3. **No Session Intelligence**: Sessions are "black boxes" with no progress visibility
+4. **Poor Session Organization**: No project-based grouping or context awareness
 
-**Missing**: A terminal-native platform that combines beautiful UI with serious session management and workflow orchestration.
+**Missing**: A terminal-native GUI that makes Claude Code sessions visual, organized, and intelligent.
 
 ## Solution Architecture
-**Fork Elia + Add CLI Provider Support + Claude Code Integration**
+**Fork Elia + Focus Entirely on Claude Code Session Management**
 
-### Phase 1: Provider Type Separation
-Extend Elia's provider system to distinguish:
-- **API Providers**: Existing OpenAI, Anthropic, Google (chat-based)
-- **CLI Providers**: New category for tools like Claude Code (session-based)
+### Phase 1: Claude Code Session Discovery
+Replace Elia's chat interface with Claude Code session management:
+- **Session Browser**: Visual list of all Claude Code sessions from filesystem
+- **Session Metadata**: Project context, last activity, git branch information
+- **Session Status**: Active/inactive detection and health monitoring
 
-### Phase 2: Claude Code Integration
-Replace chat interface with tmux session management:
-- **Session Discovery**: Find existing `claude code --resume` sessions
-- **Session Creation**: Launch new Claude Code instances in tmux
-- **Session Embedding**: Display tmux sessions within Textual interface
-- **Session Intelligence**: Background monitoring with `claude -p` summaries
+### Phase 2: Session Interface Integration
+Embed Claude Code sessions within Textual interface:
+- **Tmux Integration**: Display Claude Code sessions in terminal widgets
+- **Session Creation**: Launch new Claude Code instances with project context
+- **Session Attachment**: One-click access to existing sessions
 
-### Phase 3: Workflow Enhancement
-Add session orchestration capabilities:
-- Cross-session task delegation
-- Background session monitoring
-- Git worktree integration
-- Project-level session coordination
+### Phase 3: Session Intelligence
+Add intelligence layer for session management:
+- **Session Summaries**: Monitor session progress and achievements
+- **Project Organization**: Group sessions by project and branch
+- **Model Configuration**: GUI for Claude Code's available models
 
 ## Key Differentiators
 
-### vs Pure Elia
-- **Workflow Management**: Real AI session orchestration vs simple chat
-- **CLI Tool Integration**: Bridge to powerful development tools
-- **Session Persistence**: Background session management vs ephemeral conversations
+### vs Pure Claude Code CLI
+- **Visual Interface**: See all sessions at a glance vs manual `--resume` commands
+- **Session Intelligence**: Progress monitoring and summaries vs black box sessions
+- **Project Organization**: Grouped sessions by project vs scattered session IDs
 
 ### vs Desktop Tools (Crystal, Conductor)
 - **Terminal-Native**: No context switching from developer environment
-- **Textual Framework**: Rich terminal UI capabilities (web deployment, reactive updates)
+- **Lightweight**: Direct Claude Code integration vs complex Electron wrappers
 - **Professional Integration**: tmux compatibility, existing workflow preservation
 
 ### vs Other Terminal LLM Tools
-- **Framework Choice**: Textual vs ubiquitous Rust/Ratatui alternatives
-- **Session Focus**: Intelligence layer for workflow management vs simple chat interfaces
-- **Integration Depth**: Native Claude Code filesystem integration
+- **Claude Code Focus**: Purpose-built for the most powerful coding assistant
+- **Textual Framework**: Rich terminal UI vs basic CLI interfaces
+- **Session-Centric**: Built around persistent coding sessions vs ephemeral conversations
 
 ## Success Metrics
 1. **Session Management**: Successfully launch, attach, and manage Claude Code sessions
@@ -92,9 +93,9 @@ Developers who want:
 - Git worktree automation
 
 **Out of Scope**:
-- New LLM API integrations (use Elia's existing)
+- Generic CLI provider framework
+- Other AI tool integrations (Aider, etc.)
 - Desktop application development
-- Non-terminal UI frameworks
 - Claude Code replacement or modification
 
 ## Implementation Strategy

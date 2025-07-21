@@ -2,58 +2,60 @@
 
 ## Why Cafedelia Exists
 
-### The Terminal LLM Tool Limitation
-Existing terminal-based LLM tools fall into two limiting categories:
+### The Claude Code Interface Problem
+Claude Code is incredibly powerful but lacks proper session management:
 
-**Chat Wrappers** (Beautiful but Limited):
-- Elia: Gorgeous Textual UI, but just API chat
-- Basic terminal clients: Simple conversation interfaces
-- **Problem**: No workflow capabilities, no session management, no persistent context
+**Claude Code's Strengths**:
+- Sophisticated AI agent with deep codebase understanding
+- Advanced file manipulation and code generation
+- Git integration and project awareness
+- Support for multiple AI models (Claude 3.5 Sonnet, Haiku, Opus)
 
-**Workflow Tools** (Powerful but Primitive):
-- Claude Code: Sophisticated agent with codebase awareness
-- Aider: Git integration and multi-file coordination
-- **Problem**: Minimal session management (just `--resume`), no intelligence layer
+**Claude Code's Interface Limitations**:
+- **Primitive CLI**: Manual session ID management with `--resume`
+- **No Session Visibility**: Can't see what sessions exist or their status
+- **Poor Organization**: No project-based grouping or session categorization
+- **No Progress Tracking**: Sessions are "black boxes" with no visibility into progress
 
 ### The Gap Cafedelia Fills
-**Missing**: A terminal-native platform that combines beautiful UI with serious AI workflow orchestration.
+**Missing**: A proper GUI interface for Claude Code session management.
 
-Cafedelia bridges this gap by taking Elia's proven Textual interface and adding the session management layer that tools like Claude Code should have had from the beginning.
+Cafedelia provides the visual interface and session intelligence that Claude Code should have had from the beginning, using Elia's proven Textual framework as the foundation.
 
 ## Problems Cafedelia Solves
 
 ### 1. **Session Discovery and Management**
-**Current State**: Claude Code sessions are opaque
-- No way to see what sessions exist
-- No organization or categorization
-- Manual session ID management with `--resume`
+**Current State**: Claude Code sessions are invisible
+- `claude code --resume <session-id>` requires knowing session IDs
+- No way to browse available sessions
+- No visual indication of session status or activity
 
-**Cafedelia Solution**: Visual session browser with intelligent discovery
-- List all existing Claude Code sessions
-- Show session metadata (project, last activity, git branch)
-- One-click session attachment or creation
+**Cafedelia Solution**: Visual session browser with metadata
+- Discover all Claude Code sessions from `~/.claude/__store.db`
+- Display sessions with project context, timestamps, and activity
+- One-click session attachment without memorizing IDs
 
-### 2. **Context Switching Overhead**
-**Current State**: Constant environment switching
-- Switch between terminal and desktop session managers (Crystal, Conductor)
-- Leave terminal environment to manage AI workflows
-- Break developer flow with context switching
+### 2. **Model Configuration and Selection**
+**Current State**: Claude Code model configuration is opaque
+- No visual way to see available models
+- Model switching requires command-line flags
+- No persistent model preferences per project
 
-**Cafedelia Solution**: Terminal-native session management
-- Stay in terminal environment throughout workflow
-- Tmux integration preserves existing setup
-- Professional screen management with Textual interface
+**Cafedelia Solution**: GUI for Claude Code model management
+- Visual selection of Claude 3.5 Sonnet, Haiku, Opus models
+- Project-specific model preferences
+- Real-time model configuration without CLI arguments
 
-### 3. **Session Intelligence Gap**
-**Current State**: Sessions are "black boxes"
-- No visibility into background session progress
-- No cross-session coordination
-- No understanding of session relationships
+### 3. **Session Intelligence and Progress**
+**Current State**: Claude Code sessions are "black boxes"
+- No visibility into what the session has accomplished
+- No progress tracking or session summaries
+- No way to understand session history without scrolling
 
-**Cafedelia Solution**: Intelligence layer with `claude -p` integration
-- Background session monitoring and summarization
-- Cross-session pattern recognition
-- Task delegation with session-aware routing
+**Cafedelia Solution**: Session intelligence and monitoring
+- Parse session history for progress summaries
+- Track file modifications and achievements
+- Visual indicators of session health and activity status
 
 ### 4. **Workflow Orchestration Limitation**
 **Current State**: Manual session coordination

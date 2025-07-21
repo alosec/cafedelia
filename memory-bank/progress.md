@@ -1,9 +1,9 @@
 # Progress
 
-## Current Status: Standalone Cafedelia Complete
+## Current Status: Claude Code GUI Wrapper Foundation Complete
 **Date**: July 21, 2025  
-**Phase**: Standalone CLI Application Complete
-**Next Phase**: Claude Code Session Integration
+**Phase**: Standalone Application with Claude Code Focus
+**Next Phase**: Claude Code Model Configuration and Session Discovery
 
 ## Completed Milestones ✅
 
@@ -123,11 +123,11 @@ EliaChatModel(
 - [x] **Database Architecture**: Ready for Claude Code session sync
 - [x] **Branding Complete**: Full Cafedelia identity established
 
-### Next Implementation Steps (Claude Code Integration)
-1. **Database Sync Service**: Implement sync between Claude `__store.db` and Cafedelia
-2. **Provider Type Extension**: Add CLI provider support to model system
-3. **Session History Integration**: Show Claude Code sessions in unified history
-4. **Session Management UI**: Create interfaces for Claude Code session attachment
+### Next Implementation Steps (Claude Code GUI)
+1. **Model Configuration**: Replace API providers with Claude Code models
+2. **Session Discovery**: Sync Claude `__store.db` sessions to Cafedelia database
+3. **Session Browser**: Visual interface for Claude Code session management
+4. **Session Interface**: Tmux integration for Claude Code session display
 
 ## Known Challenges and Solutions
 
@@ -146,10 +146,10 @@ EliaChatModel(
 ## Success Metrics
 
 ### Technical Milestones
-- [ ] **Provider Type Selection**: Working UI for API vs CLI provider choice
-- [ ] **Claude Code Integration**: Successful session discovery and attachment
-- [ ] **Tmux Embedding**: CLI sessions display correctly within Textual interface
-- [ ] **Session Intelligence**: Background monitoring and summarization functional
+- [ ] **Claude Code Model Selection**: GUI for choosing Claude Code models
+- [ ] **Session Discovery**: Visual browser for all Claude Code sessions
+- [ ] **Session Management**: Create, attach, and monitor Claude Code sessions
+- [ ] **Session Intelligence**: Progress tracking and project organization
 
 ### User Experience Goals
 - [ ] **Faster Session Access**: Quicker than manual `claude code --resume`
@@ -177,10 +177,10 @@ EliaChatModel(
 ## Next Phase Preparation
 
 ### Week 1 Goals
-- [ ] Implement provider type separation in OptionsModal
-- [ ] Add Claude Code provider definition to builtin models
-- [ ] Test basic provider selection and routing logic
-- [ ] Begin session discovery prototype
+- [ ] Replace default models with Claude Code model configuration
+- [ ] Update welcome screen to emphasize Claude Code focus
+- [ ] Begin Claude Code session discovery from `__store.db`
+- [ ] Test model selection and configuration interface
 
 ### Month 1 Goals
 - [ ] Working Claude Code session discovery and selection
