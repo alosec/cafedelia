@@ -49,6 +49,9 @@ class ChatScreen(Screen[None]):
                 yield chat
                 log_viewer = SessionLogViewer()
                 log_viewer.id = "session-logs"
+                # Set session ID immediately if available
+                if self.chat_data.session_id:
+                    log_viewer.session_id = self.chat_data.session_id
                 yield log_viewer
         else:
             chat = Chat(self.chat_data)
@@ -89,15 +92,8 @@ class ChatScreen(Screen[None]):
     
     def _should_show_logs_by_default(self) -> bool:
         """Determine if logs should be shown by default for this chat."""
-        # Show logs for Claude Code sessions
-        if hasattr(self.chat_data, 'meta') and self.chat_data.meta:
-            return 'session_id' in self.chat_data.meta or 'claude_code_session' in self.chat_data.meta
-        
-        # Check if this is a Claude Code model
-        if hasattr(self.chat_data, 'model') and self.chat_data.model:
-            return getattr(self.chat_data.model, 'provider', '') == 'Claude Code'
-        
-        return False
+        # Show logs for chats that have a session_id (Claude Code sessions)
+        return self.chat_data.session_id is not None
     
     def action_toggle_logs(self) -> None:
         """Toggle the session logs panel."""
@@ -112,12 +108,9 @@ class ChatScreen(Screen[None]):
         """Update the log viewer with the current session ID."""
         try:
             log_viewer = self.query_one(SessionLogViewer)
-            chat_widget = self.query_one(Chat)
-            
-            # Get session ID from chat widget
-            if hasattr(chat_widget, '_extract_claude_session_id'):
-                session_id = chat_widget._extract_claude_session_id()
-                log_viewer.session_id = session_id
+            # Use session_id directly from chat_data
+            if self.chat_data.session_id:
+                log_viewer.session_id = self.chat_data.session_id
             
         except Exception as e:
             log.warning(f"Could not update log viewer session: {e}")
