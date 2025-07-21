@@ -92,8 +92,9 @@ class ChatScreen(Screen[None]):
     
     def _should_show_logs_by_default(self) -> bool:
         """Determine if logs should be shown by default for this chat."""
-        # Show logs for chats that have a session_id (Claude Code sessions)
-        return self.chat_data.session_id is not None
+        # Never show logs by default to prevent UI hangs from JSONL file I/O
+        # Users can press F3 to manually load logs when needed
+        return False
     
     def action_toggle_logs(self) -> None:
         """Toggle the session logs panel."""
