@@ -80,8 +80,9 @@ class ChatsManager:
         async with get_session() as session:
             chat = ChatDao(
                 model=lookup_key,
-                title="",
+                title=chat_data.title or "",
                 started_at=datetime.datetime.now(datetime.timezone.utc),
+                session_id=chat_data.session_id,  # Include session_id from chat_data
             )
             session.add(chat)
             await session.commit()
@@ -122,3 +123,15 @@ class ChatsManager:
             (await chat.awaitable_attrs.messages).append(message_dao)
             session.add(chat)
             await session.commit()
+    
+    @staticmethod
+    async def update_chat_session_id(chat_id: int, session_id: str) -> None:
+        """Update the session_id for an existing chat."""
+        async with get_session() as session:
+            statement = select(ChatDao).where(ChatDao.id == chat_id)
+            result = await session.exec(statement)
+            chat_dao = result.one()
+            chat_dao.session_id = session_id
+            await session.commit()
+            log.debug(f"Updated chat {chat_id} with session_id: {session_id}")
+

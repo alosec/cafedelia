@@ -134,3 +134,15 @@ class ChatDao(AsyncAttrs, SQLModel, table=True):
             chat.title = new_title
             session.add(chat)
             await session.commit()
+    
+    @staticmethod
+    async def find_by_session_id(session_id: str) -> "ChatDao | None":
+        """Find a chat by its Claude Code session ID."""
+        async with get_session() as session:
+            statement = (
+                select(ChatDao)
+                .where(ChatDao.session_id == session_id)
+                .options(selectinload(ChatDao.messages))
+            )
+            result = await session.exec(statement)
+            return result.one_or_none()
