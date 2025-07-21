@@ -16,6 +16,7 @@ from elia_chat.runtime_config import RuntimeConfig
 from elia_chat.screens.chat_screen import ChatScreen
 from elia_chat.screens.help_screen import HelpScreen
 from elia_chat.screens.home_screen import HomeScreen
+from elia_chat.screens.sync_manager_screen import SyncManagerScreen
 from elia_chat.themes import BUILTIN_THEMES, Theme, load_user_themes
 
 if TYPE_CHECKING:
@@ -31,6 +32,7 @@ class Elia(App[None]):
     BINDINGS = [
         Binding("q", "app.quit", "Quit", show=False),
         Binding("f1,?", "help", "Help"),
+        Binding("f9", "sync_manager", "Sync Manager", show=False),
     ]
 
     def __init__(self, config: LaunchConfig, startup_prompt: str = ""):
@@ -45,6 +47,9 @@ class Elia(App[None]):
             selected_model=config.default_model_object,
             system_prompt=config.system_prompt,
         )
+        
+        # Initialize WTE pipeline server
+        self.wte_server = None
         self.runtime_config_signal = Signal[RuntimeConfig](
             self, "runtime-config-updated"
         )
@@ -72,13 +77,24 @@ class Elia(App[None]):
         self.runtime_config_signal.publish(self.runtime_config)
 
     async def on_mount(self) -> None:
-        # Initialize sync service for Claude Code JSONL integration
+        # Initialize WTE pipeline server for modern sync architecture
         try:
-            from sync.service import sync_service
-            await sync_service.start()
+            from sync.wte.simple_manager import SimpleWTEServer
+            
+            self.wte_server = SimpleWTEServer()
+            await self.wte_server.start_server()
+            self.log.info("WTE Pipeline Server started successfully")
         except Exception as e:
-            # Log but don't fail if sync service can't start
-            self.log.warning(f"Could not start sync service: {e}")
+            # Log but don't fail if WTE server can't start
+            self.log.warning(f"Could not start WTE pipeline server: {e}")
+            
+            # Fallback to legacy sync service
+            try:
+                from sync.service import sync_service
+                await sync_service.start()
+                self.log.info("Fallback to legacy sync service")
+            except Exception as fallback_e:
+                self.log.warning(f"Legacy sync service also failed: {fallback_e}")
         
         await self.push_screen(HomeScreen(self.runtime_config_signal))
         self.theme = self.launch_config.theme
@@ -115,6 +131,7 @@ class Elia(App[None]):
                     model=model,
                 ),
             ],
+            session_id=None,  # Explicitly set to None for non-Claude Code sessions
         )
         chat.id = await ChatsManager.create_chat(chat_data=chat)
         await self.push_screen(ChatScreen(chat))
@@ -124,6 +141,13 @@ class Elia(App[None]):
             self.pop_screen()
         else:
             await self.push_screen(HelpScreen())
+    
+    async def action_sync_manager(self) -> None:
+        """Open the WTE pipeline sync manager"""
+        if self.wte_server:
+            await self.push_screen(SyncManagerScreen(self.wte_server))
+        else:
+            self.notify("WTE Pipeline Server not available", severity="error")
 
     def get_css_variables(self) -> dict[str, str]:
         if self.theme:
