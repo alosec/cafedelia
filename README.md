@@ -1,238 +1,206 @@
-<h1 align="center">
-    Cafedelia
-</h1>
-<p align="center">
-  <i align="center">Terminal AI session management platform - Beautiful UI meets serious workflow orchestration</i><br>
-  <i align="center">Fork of Elia with Claude Code CLI provider integration for professional AI-assisted development</i>
-</p>
+# Cafedelia
 
-![elia-screenshot-collage](https://github.com/darrenburns/elia/assets/5740731/75f8563f-ce1a-4c9c-98c0-1bd1f7010814)
+**The Terminal GUI for Claude Code Session Management**
 
-## Introduction
+Cafedelia provides the visual interface and session intelligence that Claude Code should have had from the beginning. Built on Elia's proven Textual framework, Cafedelia transforms Claude Code from a powerful but primitive CLI tool into a comprehensive terminal GUI.
 
-**Cafedelia** transforms Elia from a beautiful terminal chat wrapper into a comprehensive AI session management platform. Built for terminal developers who want the polish of Elia's Textual UI combined with the power of Claude Code's workflow capabilities.
+![Cafedelia - Claude Code Session Management](https://via.placeholder.com/800x400/2D2D2D/FFFFFF?text=Cafedelia%3A+Claude+Code+GUI)
 
-### The Vision
+## Why Cafedelia?
 
-Existing terminal LLM tools fall into limited categories:
-- **Chat Wrappers** (Elia, basic clients): Beautiful interfaces but no workflow capabilities  
-- **Workflow Tools** (Claude Code, Aider): Powerful agents but primitive session management
+**Claude Code is incredibly powerful but has interface limitations:**
+- Manual session management with `claude code --resume <session-id>`
+- No way to see what sessions exist or their status  
+- No visual model selection or configuration
+- Sessions are "black boxes" with no progress visibility
 
-**Cafedelia bridges this gap** - terminal-native session management with serious workflow orchestration.
+**Cafedelia solves these problems:**
+- **Visual Session Browser**: See all Claude Code sessions at a glance
+- **Model Configuration GUI**: Easy selection of Claude 3.5 Sonnet, Haiku, Opus
+- **Session Intelligence**: Progress tracking and achievement summaries  
+- **Terminal-Native**: Built for developers who live in the terminal
 
-### Key Features
+## Features
 
-- **CLI Provider Support**: Beyond API providers, integrate tools like Claude Code as first-class citizens
-- **Session Discovery**: Find and manage existing Claude Code sessions from the filesystem
-- **Tmux Integration**: Embed terminal sessions within the beautiful Textual interface
-- **Session Intelligence**: Background monitoring and workflow coordination
-- **Terminal-Native**: No context switching to desktop applications
-
-Built on Elia's proven foundation: SQLite persistence, robust configuration, professional UI patterns, and theme system.
+- **🔍 Session Discovery**: Automatically find all Claude Code sessions from `~/.claude/__store.db`
+- **📊 Session Browser**: Visual interface for browsing and organizing sessions by project
+- **🎯 Model Selection**: GUI for choosing between Claude Code's available models
+- **📈 Session Intelligence**: Progress tracking and session achievement summaries
+- **🖥️ Terminal Integration**: Embedded tmux sessions within beautiful Textual interface
+- **⚡ Quick Access**: One-click session attachment without memorizing session IDs
+- **🗂️ Project Organization**: Group sessions by project and git branch
+- **🎨 Beautiful UI**: Professional terminal interface built on Textual framework
 
 ## Installation
 
-> **Status**: In Development - Cafedelia is currently being built as an Elia fork with CLI provider support.
-
-**Current Phase**: Implementing provider type separation and Claude Code integration.
-
 ### Prerequisites
 
-- Python 3.11+
-- Claude Code CLI (`pip install claude-cli`)
-- tmux (for session management)
-
-### Development Installation
+- **Claude Code**: Cafedelia is a GUI wrapper for Claude Code
+- **tmux**: Required for session management (usually pre-installed)
 
 ```bash
-git clone https://github.com/alosec/cafedelia.git
-cd cafedelia
-pip install -e .
+# Install Claude Code (if not already installed)
+npm install -g @anthropic-ai/claude-code
+
+# Install tmux (if not already installed)
+# Ubuntu/Debian:
+sudo apt install tmux
+# macOS:
+brew install tmux
 ```
 
-### Environment Setup
+### Install Cafedelia
 
-For API providers, set environment variables:
-- `OPENAI_API_KEY` - For ChatGPT models
-- `ANTHROPIC_API_KEY` - For Claude models  
-- `GEMINI_API_KEY` - For Google models
+**Using `pipx` (recommended):**
 
-For Claude Code integration:
-- Ensure `claude code` command is available
-- Existing Claude Code sessions will be auto-discovered
-
-## Usage
-
-### API Providers (Inherited from Elia)
-
-Launch with traditional chat interface:
 ```bash
-cafedelia -m gpt-4o "Help me debug this function"
+pipx install cafedelia
 ```
 
-### CLI Providers (Cafedelia Innovation)
+**Using `pip`:**
 
-**Session Discovery**: Browse existing Claude Code sessions
 ```bash
-cafedelia --provider claude-code --list-sessions
+pip install cafedelia
 ```
 
-**Session Management**: Launch or resume sessions in terminal UI
-```bash
-cafedelia --provider claude-code --session my-project
-```
+After installation, run Cafedelia using the `cafedelia` command.
 
-**Background Intelligence**: Monitor active sessions
-```bash
-cafedelia --monitor --session-intelligence
-```
+## Getting Started
 
-## Running local models
+1. **Install Claude Code and Cafedelia** using the instructions above
+2. **Set your Anthropic API key** (required for Claude Code):
+   ```bash
+   export ANTHROPIC_API_KEY="your-api-key-here"
+   ```
+3. **Run Cafedelia**:
+   ```bash
+   cafedelia
+   ```
+4. **Browse your Claude Code sessions** visually in the interface
+5. **Select or create sessions** with one-click access
 
-1. Install [`ollama`](https://github.com/ollama/ollama).
-2. Pull the model you require, e.g. `ollama pull llama3`.
-3. Run the local ollama server: `ollama serve`.
-4. Add the model to the config file (see below).
+### First Time Setup
+
+When you first run Cafedelia:
+- It will create its own database at `~/.local/share/cafedelia/cafedelia.sqlite`
+- Existing Claude Code sessions will be automatically discovered from `~/.claude/__store.db`
+- You can immediately browse and attach to any existing Claude Code sessions
+
+### Claude Code Integration
+
+Cafedelia works by:
+- **Session Discovery**: Reading Claude Code's session data from `~/.claude/__store.db`
+- **Tmux Integration**: Launching Claude Code sessions in tmux for terminal embedding
+- **Intelligent Display**: Showing session metadata, project context, and progress
 
 ## Configuration
 
-Cafedelia extends Elia's configuration system with CLI provider support. Configuration location shown in options window (`ctrl+o`).
+Cafedelia can be configured using a TOML file located at `~/.config/cafedelia/config.toml`.
 
-### Basic Configuration
+Here's an example configuration file:
 
 ```toml
-# Default provider selection
-default_provider_type = "cli"  # "api" or "cli"
-default_model = "claude-code-session"
+[general]
+# The default Claude model to use for new sessions
+default_model = "claude-3-5-sonnet-20241022"
 
-# UI preferences  
-theme = "galaxy"
-message_code_theme = "dracula"
+# UI theme - choose from "dark", "light", "nebula", "sunset", "nord", "dracula", "synthwave"
+theme = "dark"
+
+[claude_code]
+# Claude Code session discovery settings
+auto_discover_sessions = true
+session_refresh_interval = 30  # seconds
+
+# Model preferences for Claude Code
+available_models = [
+    "claude-3-5-sonnet-20241022",
+    "claude-3-5-haiku-20241022", 
+    "claude-3-opus-20240229"
+]
+
+# Session management
+max_concurrent_sessions = 5
+session_timeout = 3600  # 1 hour
 ```
 
-### API Providers (Inherited from Elia)
+## Usage
 
-```toml
-[[models]]
-name = "gpt-4o"
-provider_type = "api"  # explicit for clarity
+### Basic Usage
 
-[[models]]
-name = "ollama/llama3"
-provider_type = "api"
+Run Cafedelia to open the Claude Code session browser:
 
-[[models]]
-name = "groq/llama2-70b-4096"
-display_name = "Llama 2 70B"
-provider = "Groq"
-provider_type = "api"
-```
-
-### CLI Providers (Cafedelia Innovation)
-
-```toml
-# Claude Code integration
-[[models]]
-id = "claude-code-session"
-name = "Claude Code"
-display_name = "Claude Code Session"
-provider_type = "cli"
-cli_command = "claude code"
-session_manager = "tmux"
-
-# Future CLI providers
-[[models]]
-id = "aider-session"  
-name = "Aider"
-display_name = "Aider Coding Assistant"
-provider_type = "cli"
-cli_command = "aider"
-session_manager = "tmux"
+```bash
+cafedelia
 ```
 
 ### Session Management
 
-```toml
-[session_management]
-# Session discovery settings
-auto_discover = true
-session_timeout = "1h"
-background_monitoring = true
+- **Browse Sessions**: See all Claude Code sessions with project context and timestamps
+- **Attach to Session**: Click any session to attach to it via tmux integration
+- **Create New Session**: Start a new Claude Code session with selected model and project
+- **Monitor Progress**: View session intelligence and achievement summaries
 
-# Tmux integration
-tmux_session_prefix = "cafedelia"
-tmux_control_mode = true
-```
+### Key Bindings
 
-## Custom themes
+- `ctrl+o` - Open model configuration and session options
+- `ctrl+n` - Create a new Claude Code session
+- `ctrl+s` - Save current session state
+- `ctrl+r` - Refresh session list from Claude Code database
+- `ctrl+x` - Exit Cafedelia
+- `escape` - Go back or close modal
+- `f1` or `?` - Open help
+- `tab` and `shift+tab` - Navigate between UI elements
 
-Add a custom theme YAML file to the themes directory.
-You can find the themes directory location by pressing `ctrl+o` on the home screen and looking for the `Themes directory` line.
+### Integration with Claude Code
 
-Here's an example of a theme YAML file:
+Cafedelia seamlessly integrates with your existing Claude Code workflow:
+- All existing sessions are automatically discovered
+- Session attachments preserve tmux environment
+- Model configurations sync with Claude Code settings
+- No changes to your existing Claude Code workflow required
 
-```yaml
-name: example  # use this name in your config file
-primary: '#4e78c4'
-secondary: '#f39c12'
-accent: '#e74c3c'
-background: '#0e1726'
-surface: '#17202a'
-error: '#e74c3c'  # error messages
-success: '#2ecc71'  # success messages
-warning: '#f1c40f'  # warning messages
-```
+## Architecture
 
-## Changing keybindings
+Cafedelia is built on proven technologies:
 
-Right now, keybinds cannot be changed. Terminals are also rather limited in what keybinds they support.
-For example, pressing <kbd>Cmd</kbd>+<kbd>Enter</kbd> to send a message is not possible (although we may support a protocol to allow this in some terminals in the future).
-
-For now, I recommend you map whatever key combo you want at the terminal emulator level to send `\n`.
-Here's an example using iTerm:
-
-<img width="848" alt="image" src="https://github.com/darrenburns/elia/assets/5740731/94b6e50c-429a-4d17-99c2-affaa828f35b">
-
-With this mapping in place, pressing <kbd>Cmd</kbd>+<kbd>Enter</kbd> will send a message to the LLM, and pressing <kbd>Enter</kbd> alone will create a new line.
+- **[Textual Framework](https://github.com/Textualize/textual)**: Modern Python terminal UI framework
+- **Claude Code Integration**: Direct integration with Claude Code's session system
+- **tmux**: Terminal multiplexer for session management
+- **SQLite**: Local database for session intelligence and caching
 
 ## Development Status
 
-Cafedelia is actively being developed as an Elia fork. Current implementation phases:
+> **Status**: Early Development - Core functionality being implemented
 
-### ✅ Completed
-- [x] **Project Foundation**: Memory bank, architecture documentation
-- [x] **Repository Setup**: Clean fork with independent git history  
-- [x] **Vision Definition**: Clear product strategy and technical approach
+### Current Status
+- ✅ Standalone Cafedelia application
+- ✅ Complete branding and identity  
+- ✅ Database separation from Elia
+- 🚧 Claude Code session discovery
+- 🚧 Model configuration GUI
+- 📋 Session intelligence and monitoring
 
-### 🚧 In Progress  
-- [ ] **Provider Type Separation**: Extend OptionsModal for API vs CLI selection
-- [ ] **Claude Code Integration**: Session discovery and management
-- [ ] **Tmux Embedding**: Terminal session display within Textual interface
+## Relationship to Elia
 
-### 📋 Planned
-- [ ] **Session Intelligence**: Background monitoring and summarization
-- [ ] **Cross-Session Coordination**: Workflow orchestration capabilities
-- [ ] **Additional CLI Providers**: Aider, other AI development tools
+Cafedelia is a focused fork of [Elia](https://github.com/darrenburns/elia) specifically designed for Claude Code session management. While Elia is a general-purpose LLM chat interface, Cafedelia is purpose-built to be the GUI that Claude Code should have had from the beginning.
 
 ## Contributing
 
-Cafedelia represents the missing link between beautiful terminal interfaces and serious AI workflow management. We're building the session intelligence layer that should have existed from the beginning.
+Contributions are welcome! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
-**Areas of Focus**:
-- Textual UI development and tmux integration
-- AI workflow orchestration patterns
-- Terminal-native session management
-- Claude Code and AI tool integrations
+Areas of focus:
+- Claude Code integration and session management
+- Textual UI development for terminal environments
+- Session intelligence and progress tracking
+- Terminal workflow optimization
 
-## Project Goals
+## License
 
-Transform terminal AI interaction from simple chat to comprehensive session management:
+MIT
 
-1. **Preserve Elia's Strengths**: Beautiful UI, robust configuration, professional patterns
-2. **Add CLI Provider Support**: First-class integration with tools like Claude Code  
-3. **Enable Session Intelligence**: Background monitoring and workflow coordination
-4. **Stay Terminal-Native**: No desktop context switching required
+## Acknowledgements
 
-## Acknowledgments
-
-Built upon [Elia](https://github.com/darrenburns/elia) by Darren Burns - an excellent foundation for terminal LLM interaction that deserved serious workflow capabilities.
+- Built on the [Textual framework](https://github.com/Textualize/textual) by [Textualize](https://www.textualize.io/)
+- Forked from [Elia](https://github.com/darrenburns/elia) by [Darren Burns](https://github.com/darrenburns)
+- Designed specifically for [Claude Code](https://claude.ai/code) by Anthropic
