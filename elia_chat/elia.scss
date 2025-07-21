@@ -574,3 +574,68 @@ HelpScreen {
     }
   }
 }
+
+/* Session Log Viewer Styling */
+SessionLogViewer {
+  width: 40%;
+  min-width: 30;
+  max-width: 60%;
+  border-left: solid $main-lighten-1 50%;
+  background: $surface-darken-1;
+}
+
+SessionLogViewer #log-header {
+  dock: top;
+  height: 3;
+  background: $main-darken-2 70%;
+  color: $text;
+  padding: 1 2;
+  text-style: bold;
+}
+
+SessionLogViewer #log-content {
+  background: $surface-darken-2;
+  color: $text-muted;
+  scrollbar-size-vertical: 1;
+  scrollbar-background: $surface-darken-2;
+  scrollbar-color: $main-lighten-1 30%;
+}
+
+SessionLogViewer TextArea {
+  background: $surface-darken-2;
+  color: $text-muted;
+  border: none;
+}
+
+/* Adjust main chat width when logs are visible */
+ChatScreen Horizontal Chat {
+  width: 60%;
+  min-width: 40%;
+}
+
+/* Log viewer specific text styling */
+.session-logs {
+  text-style: none;
+  color: $text-muted;
+  background: $surface-darken-2;
+}
+
+/* JSON syntax highlighting improvements */
+SessionLogViewer TextArea.session-logs {
+  & .json-key {
+    color: $accent;
+    text-style: bold;
+  }
+  
+  & .json-string {
+    color: $success;
+  }
+  
+  & .json-number {
+    color: $warning;
+  }
+  
+  & .json-boolean {
+    color: $error;
+  }
+}

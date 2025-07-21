@@ -1,0 +1,200 @@
+"""
+Session Log Viewer widget for real-time JSONL tailing.
+
+Shows raw Claude Code JSON responses alongside the formatted chat interface,
+providing detailed debugging visibility into the streaming protocol.
+"""
+
+import asyncio
+import json
+import logging
+from pathlib import Path
+from typing import Optional
+
+from textual import work
+from textual.app import ComposeResult
+from textual.containers import Vertical
+from textual.reactive import reactive
+from textual.widget import Widget
+from textual.widgets import TextArea, Static
+
+logger = logging.getLogger(__name__)
+
+
+class SessionLogViewer(Widget):
+    """Real-time JSONL log viewer for Claude Code sessions."""
+    
+    session_id: reactive[Optional[str]] = reactive(None)
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._log_file_path: Optional[Path] = None
+        self._tail_task: Optional[asyncio.Task] = None
+        self._is_tailing = False
+        
+    def compose(self) -> ComposeResult:
+        """Compose the log viewer UI."""
+        with Vertical():
+            yield Static("📄 Session Logs", id="log-header")
+            yield TextArea(
+                read_only=True,
+                language="json",
+                theme="monokai",
+                id="log-content",
+                classes="session-logs"
+            )
+    
+    def watch_session_id(self, session_id: Optional[str]) -> None:
+        """React to session ID changes."""
+        if session_id:
+            self._start_tailing(session_id)
+        else:
+            self._stop_tailing()
+    
+    def _start_tailing(self, session_id: str) -> None:
+        """Start tailing the JSONL file for the given session."""
+        try:
+            # Determine the JSONL file path based on current project
+            project_path = Path.cwd()
+            project_name = str(project_path).replace('/', '-')
+            # Add leading dash as Claude Code uses it in directory names
+            if not project_name.startswith('-'):
+                project_name = '-' + project_name
+            
+            jsonl_path = Path.home() / ".claude" / "projects" / project_name / f"{session_id}.jsonl"
+            
+            if not jsonl_path.exists():
+                logger.warning(f"JSONL file not found: {jsonl_path}")
+                self._show_status(f"❌ Log file not found: {jsonl_path}")
+                return
+                
+            self._log_file_path = jsonl_path
+            self._show_status(f"📡 Tailing: {jsonl_path.name}")
+            
+            # Start the tailing task
+            if self._tail_task:
+                self._tail_task.cancel()
+            self._tail_task = asyncio.create_task(self._tail_file())
+            
+        except Exception as e:
+            logger.error(f"Error starting log tail for session {session_id}: {e}")
+            self._show_status(f"❌ Error: {e}")
+    
+    def _stop_tailing(self) -> None:
+        """Stop tailing the current file."""
+        if self._tail_task:
+            self._tail_task.cancel()
+            self._tail_task = None
+        self._is_tailing = False
+        self._show_status("⏸️ No active session")
+    
+    async def _tail_file(self) -> None:
+        """Tail the JSONL file and update the text area."""
+        if not self._log_file_path:
+            return
+            
+        try:
+            self._is_tailing = True
+            
+            # Read existing content first
+            if self._log_file_path.exists():
+                with open(self._log_file_path, 'r', encoding='utf-8') as f:
+                    existing_content = f.read()
+                    if existing_content.strip():
+                        self._append_content(existing_content)
+            
+            # Start tailing new content
+            last_size = self._log_file_path.stat().st_size if self._log_file_path.exists() else 0
+            
+            while self._is_tailing:
+                try:
+                    current_size = self._log_file_path.stat().st_size
+                    
+                    if current_size > last_size:
+                        # New content available
+                        with open(self._log_file_path, 'r', encoding='utf-8') as f:
+                            f.seek(last_size)
+                            new_content = f.read()
+                            if new_content.strip():
+                                self._append_content(new_content)
+                        last_size = current_size
+                    
+                    await asyncio.sleep(0.1)  # Check every 100ms
+                    
+                except FileNotFoundError:
+                    # File might not exist yet, wait and retry
+                    await asyncio.sleep(0.5)
+                except Exception as e:
+                    logger.error(f"Error tailing file: {e}")
+                    break
+                    
+        except asyncio.CancelledError:
+            logger.debug("Log tailing cancelled")
+        except Exception as e:
+            logger.error(f"Error in tail_file: {e}")
+            self._show_status(f"❌ Tailing error: {e}")
+        finally:
+            self._is_tailing = False
+    
+    def _append_content(self, content: str) -> None:
+        """Append new content to the log viewer with JSON formatting."""
+        log_area = self.query_one("#log-content", TextArea)
+        
+        # Parse and format each JSON line
+        formatted_lines = []
+        for line in content.strip().split('\n'):
+            if line.strip():
+                try:
+                    # Parse JSON and reformat it with indentation
+                    json_obj = json.loads(line)
+                    formatted_json = json.dumps(json_obj, indent=2, ensure_ascii=False)
+                    formatted_lines.append(formatted_json)
+                    formatted_lines.append("-" * 40)  # Separator
+                except json.JSONDecodeError:
+                    # If not valid JSON, show raw line
+                    formatted_lines.append(f"[RAW] {line}")
+                    formatted_lines.append("-" * 40)
+        
+        if formatted_lines:
+            new_text = '\n'.join(formatted_lines)
+            
+            # Append to existing content
+            current_text = log_area.text
+            if current_text:
+                log_area.text = current_text + '\n\n' + new_text
+            else:
+                log_area.text = new_text
+            
+            # Auto-scroll to bottom
+            log_area.scroll_end()
+    
+    def _show_status(self, message: str) -> None:
+        """Show status message in the header."""
+        try:
+            header = self.query_one("#log-header", Static)
+            header.update(message)
+        except:
+            pass  # Ignore if not mounted yet
+    
+    async def on_unmount(self) -> None:
+        """Clean up when the widget is unmounted."""
+        self._stop_tailing()
+    
+    def clear_logs(self) -> None:
+        """Clear the log content."""
+        try:
+            log_area = self.query_one("#log-content", TextArea)
+            log_area.text = ""
+        except:
+            pass
+    
+    def save_logs(self, file_path: str) -> bool:
+        """Save current log content to a file."""
+        try:
+            log_area = self.query_one("#log-content", TextArea)
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(log_area.text)
+            return True
+        except Exception as e:
+            logger.error(f"Error saving logs: {e}")
+            return False
