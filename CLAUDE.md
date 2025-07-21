@@ -21,8 +21,8 @@ Cafedelia is a Python TUI (Terminal User Interface) chat application for browsin
 # Activate virtual environment
 source /home/alex/code/cafedelia/.venv/bin/activate
 
-# Run the application
-python -m elia_chat
+# IMPORTANT: Never run the Textual app via Claude Code - it breaks terminal
+# python -m elia_chat  # ❌ DO NOT RUN - Terminal will break in Claude Code
 
 # Run database migrations
 python -m elia_chat.database.migrations.<migration_name>
@@ -32,6 +32,9 @@ python -m pytest tests/
 
 # Direct database access
 sqlite3 ~/.local/share/cafedelia/cafedelia.sqlite
+
+# CLI utilities and testing (safe to run)
+python -m elia_chat --help  # ✅ Safe - shows help only
 ```
 
 ### Architecture Notes
@@ -57,5 +60,7 @@ DELETE FROM message WHERE chat_id NOT IN (SELECT id FROM chat);
 
 ### Troubleshooting
 - Always activate venv before Python commands
+- **NEVER** run `python -m elia_chat` in Claude Code sessions - Textual apps break terminal
 - Database corruption: Delete `~/.local/share/cafedelia/cafedelia.sqlite` to rebuild from JSONL
 - Sync issues: Check deduplication service logs and session_id uniqueness
+- Testing: Use `--help` flag or specific utilities for safe Claude Code testing

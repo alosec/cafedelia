@@ -97,46 +97,65 @@ async def parse_jsonl_metadata(self, file_path: Path) -> SessionMetadata:
 - Automatic session ID capture and JSONL file tailing
 - Professional debugging experience with syntax highlighting
 
-## BREAKTHROUGH: JSONL-First Architecture (July 21, 2025) 🚀
+## 🚨 CRITICAL ARCHITECTURE LESSON: SQLite-First is Correct (July 21, 2025)
 
-### Revolutionary Insight: Skip Database Entirely
-SessionLogViewer debugging revealed fundamental architectural opportunity:
-- **Discovery**: Initial file load fails while tailing works - diagnostic complete
-- **Root Cause**: Database sync is unreliable middleman causing data loss/complexity
-- **Solution**: Render chat interface directly from JSONL files (single source of truth)
+### Performance Crisis Discovery
+JSONL-First approach caused **critical performance issues**:
+- **Chat Opens Hang**: UI becomes unresponsive during chat opening
+- **Root Cause**: `ChatScreen._should_show_logs_by_default()` automatically loads JSONL files
+- **Scope**: Affects all 416 synced sessions (any chat with session_id)
+- **File I/O Blocking**: 50KB+ JSONL reads block main UI thread during compose/mount
 
-### JSONL-First Implementation Strategy ✅
-**Phase 1**: Fix SessionLogViewer initial load (prove JSONL rendering capability)
-**Phase 2**: Enhance JSONL content extraction (match current chat interface quality)
-**Phase 3**: Replace database-driven chat with JSONL-driven interface  
-**Phase 4**: Add interactive Claude Code overlay for live session interaction
+### ❌ JSONL-First UI Loading: Anti-Pattern Identified
+```python
+# BAD: Direct JSONL loading in UI components
+async def compose(self) -> ComposeResult:
+    if self.chat_data.session_id:  # ❌ Triggers for all 416 synced sessions
+        yield SessionLogViewer()   # ❌ Heavy I/O during composition
+```
 
-### Technical Benefits
-- **Perfect Fidelity**: Chat shows exactly what's in session logs (no sync failures)
-- **Zero Duplication**: Eliminate redundant data storage in database
-- **Real-time Updates**: File tailing provides immediate UI updates
-- **Rich Detail**: Access to full Claude Code metadata without lossy conversion
+**Why JSONL-First UI Fails:**
+- **Blocking I/O**: File operations during widget composition
+- **Scale Issues**: Gets worse with larger session files
+- **User Experience**: Chat opening becomes unusable
+- **Thread Blocking**: Main UI thread blocked by file operations
 
-### User Experience Vision
-- **Chat Interface**: Renders directly from JSONL with existing rich formatting
-- **Interactive Layer**: Overlay live Claude Code CLI on top of JSONL display
-- **Perfect Parity**: Session logs and chat interface show identical content
-- **No Limitations**: Full Claude Code functionality with superior UX
+### ✅ CORRECT ARCHITECTURE: SQLite-First with On-Demand JSONL
+**Principle**: Database for UI speed, JSONL for optional detail
 
-### Current Status: SessionLogViewer Diagnosis Complete ✅
-- **Test Case**: Session `3c6aadac-fb63-415b-8593-68e90e89a985` (350KB, 140 lines)
-- **Confirmed Working**: Session ID detection, file discovery, reactive triggers
-- **Confirmed Broken**: Initial file load (tailing works for new content)
-- **Next Step**: Fix initial load to demonstrate JSONL rendering capability
+```python
+# GOOD: Fast database queries for UI
+async def load_chat(chat_id: int) -> ChatData:
+    return await ChatsManager.get_chat(chat_id)  # Instant response
 
-### Session ID Display Infrastructure Completed ✅
-- **History Widget**: Session IDs display properly (full UUID, no truncation)
-- **Chat Header**: Session IDs in header (format: "Model Name • session-id")
-- **Database Integration**: ChatData model includes session_id, converters updated
-- **Debug Logging**: Comprehensive SessionLogViewer instrumentation added
+# GOOD: JSONL only when user explicitly requests (F3)
+async def load_logs_on_f3_press(session_id: str):
+    await self.background_load_jsonl(session_id)  # Non-blocking
+```
 
-## Implementation Priority: JSONL-First Proof of Concept
-1. **Fix Initial Load**: Resolve SessionLogViewer blank display issue
-2. **Prove Concept**: Demonstrate rich chat rendering from JSONL files
-3. **Enhance Extraction**: Apply existing ContentExtractor to JSONL content
-4. **Replace Interface**: Transition from database-driven to JSONL-driven chat
+### Hybrid Architecture: The Correct Balance ✅
+```
+UI Data Flow (Fast Path):
+Database (SQLite) → UI Components → Instant Display
+
+Detail Data Flow (On-Demand Only):  
+User F3 Press → Background JSONL → Log Viewer → Optional Display
+```
+
+### Performance Lessons Learned ✅
+1. **Database for Speed**: Use SQLite for all primary UI data
+2. **JSONL for Detail**: Load JSONL files only when explicitly requested
+3. **No Auto-Loading**: Never automatically load JSONL during UI composition
+4. **Background Processing**: Heavy operations must be async/background
+5. **User Intent**: Only load expensive data when user asks for it
+
+### Implementation Priority: Fix Chat Opening Performance
+1. **URGENT**: Disable automatic SessionLogViewer loading in ChatScreen
+2. **Change**: `_should_show_logs_by_default()` to always return False  
+3. **Optimize**: F3 log loading with streaming/pagination
+4. **Background**: Make all JSONL processing non-blocking
+
+### Data Flow Architecture (Corrected) ✅
+- **Primary UI**: SQLite database (instant, responsive)
+- **Background Sync**: JSONL → SQLite via WTE pipeline (perfect data integrity)  
+- **Detail View**: JSONL direct access only when user requests (F3)
