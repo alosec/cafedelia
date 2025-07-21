@@ -126,6 +126,9 @@ class ChatScreen(Screen[None]):
     @on(Chat.SessionIdCaptured)
     def on_session_id_captured(self, event: Chat.SessionIdCaptured) -> None:
         """Handle Claude Code session ID capture for log tailing."""
+        # Update the chat data's session_id
+        self.chat_data.session_id = event.session_id
+        
         if self._log_viewer_visible:
             try:
                 log_viewer = self.query_one(SessionLogViewer)

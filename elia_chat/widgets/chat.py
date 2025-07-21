@@ -339,6 +339,22 @@ class Chat(Widget):
 
     async def action_details(self) -> None:
         await self.app.push_screen(ChatDetails(self.chat_data))
+    
+    @on(SessionIdCaptured)
+    async def on_session_id_captured(self, event: SessionIdCaptured) -> None:
+        """Handle Claude Code session ID capture for persistence."""
+        # Update chat data with session ID
+        self.chat_data.session_id = event.session_id
+        
+        # Update database with session ID if chat already exists
+        if self.chat_data.id:
+            try:
+                await ChatsManager.update_chat_session_id(
+                    self.chat_data.id, event.session_id
+                )
+                log.debug(f"Updated chat {self.chat_data.id} with session ID: {event.session_id}")
+            except Exception as e:
+                log.error(f"Failed to update session ID in database: {e}")
 
     def _is_claude_code_session(self) -> bool:
         """Check if this is a Claude Code session."""
@@ -531,11 +547,10 @@ class Chat(Widget):
                     )
             
             # Update chat data with session ID for future reference
-            if hasattr(self.chat_data, 'meta'):
-                if not self.chat_data.meta:
-                    self.chat_data.meta = {}
-                self.chat_data.meta['session_id'] = actual_session_id
-                self.chat_data.meta['claude_code_session'] = True
+            if actual_session_id:
+                self.chat_data.session_id = actual_session_id
+                # Emit the updated session ID for persistence
+                self.post_message(self.SessionIdCaptured(actual_session_id))
             
             # Ensure the message content is updated with final response
             if response_content:
