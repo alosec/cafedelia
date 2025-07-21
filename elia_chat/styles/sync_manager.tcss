@@ -1,0 +1,175 @@
+/* Sync Manager Styles */
+
+#sync-manager {
+    padding: 1;
+    height: 100%;
+}
+
+.title {
+    text-align: center;
+    text-style: bold;
+    color: $primary;
+    margin-bottom: 1;
+}
+
+.server-controls {
+    margin-bottom: 2;
+    padding: 1;
+    border: solid $primary;
+    border-title: "Server Controls";
+}
+
+.server-btn {
+    margin-right: 1;
+    min-width: 12;
+}
+
+.server-status-label {
+    margin-left: 2;
+    margin-right: 1;
+}
+
+.server-status-value {
+    color: $accent;
+    text-style: bold;
+}
+
+.pipelines-container {
+    height: 1fr;
+}
+
+.pipeline-widget {
+    margin-bottom: 1;
+}
+
+.pipeline-container {
+    border: solid $secondary;
+    border-title: "Pipeline Status";
+    padding: 1;
+}
+
+.pipeline-header {
+    margin-bottom: 1;
+}
+
+.pipeline-name {
+    text-style: bold;
+    color: $primary;
+    margin-right: 2;
+    min-width: 20;
+}
+
+.start-btn {
+    background: $success;
+    color: $text;
+    margin-right: 1;
+    min-width: 8;
+}
+
+.stop-btn {
+    background: $error;
+    color: $text;
+    margin-right: 1;
+    min-width: 8;
+}
+
+.restart-btn {
+    background: $warning;
+    color: $text;
+    min-width: 8;
+}
+
+.pipeline-status {
+    margin-bottom: 1;
+}
+
+.status-label, .events-label, .errors-label {
+    margin-right: 1;
+    min-width: 8;
+}
+
+.status-value {
+    color: $accent;
+    text-style: bold;
+    margin-right: 2;
+    min-width: 10;
+}
+
+.events-value {
+    color: $success;
+    text-style: bold;
+    margin-right: 2;
+    min-width: 8;
+}
+
+.errors-value {
+    color: $error;
+    text-style: bold;
+    margin-right: 2;
+    min-width: 8;
+}
+
+.error-message {
+    color: $error;
+    text-style: italic;
+    max-height: 2;
+}
+
+.system-info {
+    border: solid $secondary;
+    border-title: "System Information";
+    padding: 1;
+    margin-top: 1;
+}
+
+.section-title {
+    text-style: bold;
+    color: $primary;
+    margin-bottom: 1;
+}
+
+.system-stat {
+    margin-bottom: 1;
+    color: $accent;
+}
+
+.sync-modal {
+    width: 90%;
+    height: 90%;
+    background: $surface;
+    border: thick $primary;
+    border-title: "WTE Pipeline Manager";
+}
+
+.modal-buttons {
+    dock: bottom;
+    height: 3;
+    padding: 1;
+    text-align: center;
+}
+
+#sync-screen-container {
+    height: 100%;
+    padding: 1;
+}
+
+/* Status-specific colors */
+.pipeline-container[data-status="running"] {
+    border: solid $success;
+}
+
+.pipeline-container[data-status="error"] {
+    border: solid $error;
+}
+
+.pipeline-container[data-status="stopped"] {
+    border: solid $secondary;
+}
+
+.pipeline-container[data-status="starting"] {
+    border: solid $warning;
+}
+
+.pipeline-container[data-status="stopping"] {
+    border: solid $warning;
+}
