@@ -2,9 +2,9 @@
 
 ## Current State  
 - **Date**: July 21, 2025
-- **Focus**: WTE Pipeline Management & Sync Validation Guard
-- **Status**: MAJOR BREAKTHROUGH - Comprehensive sync infrastructure with GUI management
-- **Next**: Enhanced parsing for 42 sessions with complex structured content
+- **Focus**: Chat Opening Performance & SQLite-First Architecture
+- **Status**: CRITICAL ISSUE - Chat opens hanging due to automatic JSONL log loading
+- **Next**: Reorient to SQLite-first UI data, lazy-load logs on F3 only
 
 ## Model Selection Implementation (July 21, 2025)
 
@@ -194,24 +194,32 @@ with RadioSet(id="provider-types"):
 - **Enhanced parsing logic** successfully processes `content: [{"type":"text","text":"..."}]` structures
 - **Perfect data integrity** maintained across entire JSONL dataset
 
-#### ✅ Technical Implementation Completed
-1. **Enhanced Structured Content Parser** ✅ DONE
-   - ✅ Handle list-type content in JSONL user messages
-   - ✅ Parse complex message structures with nested data  
-   - ✅ Implement robust content extraction for all JSONL formats
-   - ✅ Achieved perfect 100% sync rate from previous 89.9%
+### 🚨 CRITICAL ISSUE IDENTIFIED: Chat Opening Performance (July 21, 2025)
 
-2. **WTE Pipeline Optimization** (Week 1)
-   - Integration with existing sync service
-   - Performance optimization for 416 session dataset
-   - Background validation scheduling
-   - Pipeline health monitoring and alerting
+#### ❌ Chat Opening Hangs Problem
+**ROOT CAUSE DISCOVERED**: ChatScreen automatically loads JSONL logs for all sessions with session_id
 
-3. **JSONL-First Architecture Evolution** (Week 2)
-   - Complete migration to JSONL-driven interfaces
-   - Enhanced real-time file tailing capabilities
-   - Direct JSONL rendering without database bottleneck
-   - Perfect fidelity session display
+**Performance Impact:**
+- **Chat opens hang** during JSONL file I/O operations
+- **Automatic log loading** triggered by `_should_show_logs_by_default()` for all 416 synced sessions
+- **Heavy file operations** during chat compose/mount phase
+- **Poor user experience** with UI blocking on chat opening
+
+#### 🎯 Immediate Priority: SQLite-First Architecture Pivot
+1. **Fix Automatic JSONL Loading** 🔥 URGENT
+   - Disable automatic SessionLogViewer loading in ChatScreen
+   - Only load logs when user explicitly presses F3
+   - Remove `_should_show_logs_by_default()` automatic behavior
+
+2. **SQLite-First UI Data** (Current)
+   - Pull all chat display data from database only
+   - Use JSONL files as background data source, not UI source
+   - Optimize database queries for fast chat opening
+
+3. **Optimized Log Loading** (Week 1)
+   - Intelligent JSON parsing with streaming
+   - Lazy loading with pagination for large log files
+   - Background processing for log viewer performance
 
 ## Technical Context
 

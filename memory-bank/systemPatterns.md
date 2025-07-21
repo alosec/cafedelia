@@ -229,49 +229,77 @@ class ContentExtractor:
         # Same logic as historical transformer for consistency
 ```
 
-#### JSONL-First Chat Interface Pattern (REVOLUTIONARY) 🚀
-```python
-class JSONLChatInterface(Widget):
-    """Revolutionary JSONL-first chat interface eliminating database sync."""
-    
-    session_id: reactive[Optional[str]] = reactive(None)
-    
-    async def load_session_from_jsonl(self, session_id: str) -> None:
-        """Load and render entire chat from JSONL file directly."""
-        jsonl_path = self.discover_session_file(session_id)
-        
-        # Parse JSONL into conversation format
-        conversation = await self.parse_jsonl_to_conversation(jsonl_path)
-        
-        # Render with same quality as database-driven interface
-        await self.render_conversation(conversation)
-        
-        # Start tailing for real-time updates
-        await self.start_tailing(jsonl_path)
-    
-    async def parse_jsonl_to_conversation(self, jsonl_path: Path) -> ConversationFlow:
-        """Extract rich conversation content directly from JSONL."""
-        # Use existing ContentExtractor logic
-        # Group messages into conversation blocks
-        # Apply rich formatting for tool calls and results
-        # Return structured conversation for rendering
+#### 🚨 CRITICAL ARCHITECTURAL INSIGHT: SQLite-First is Correct Pattern
 
-class InteractiveOverlay(Widget):
-    """Interactive Claude Code CLI overlay on top of JSONL interface."""
-    
-    async def send_message(self, message: str) -> None:
-        """Send message to live Claude Code CLI."""
-        # Existing streaming integration
-        # Updates automatically appear in JSONL file
-        # UI reflects changes through tailing mechanism
+**PROBLEM DISCOVERED**: JSONL-first approach causes UI performance issues
+
+#### ❌ JSONL-First UI Loading Anti-Pattern
+```python
+# PROBLEMATIC: Direct JSONL loading in UI components
+class JSONLChatInterface(Widget):
+    async def load_session_from_jsonl(self, session_id: str) -> None:
+        """❌ BAD: Heavy I/O operations block UI thread"""
+        jsonl_path = self.discover_session_file(session_id)
+        # Heavy file I/O during UI composition - CAUSES HANGS
+        conversation = await self.parse_jsonl_to_conversation(jsonl_path)
 ```
 
-#### JSONL-First Architecture Benefits ✅
-- **Single Source of Truth**: JSONL files contain authoritative session data
-- **Zero Sync Failures**: No database intermediary to fail or duplicate data
-- **Perfect Fidelity**: Chat interface shows exactly what Claude Code generates
-- **Real-time Updates**: File tailing provides immediate reflection of changes
-- **Detailed Information**: Access to full Claude Code metadata without data loss
+**Why JSONL-First UI Loading Fails:**
+- **Blocking I/O**: File operations block main UI thread
+- **Composition Slowdown**: Heavy processing during widget compose/mount
+- **User Experience**: Chat opens become unresponsive
+- **Scale Issues**: Worse with larger session files (50KB+)
+
+#### ✅ CORRECT: SQLite-First UI Architecture Pattern
+```python
+class OptimizedChatInterface(Widget):
+    """Correct pattern: Fast database-driven UI with optional JSONL detail loading."""
+    
+    async def load_chat_from_database(self, chat_id: int) -> ChatData:
+        """✅ GOOD: Fast database query for UI display"""
+        return await ChatsManager.get_chat(chat_id)  # Instant response
+    
+    async def load_session_logs_on_demand(self, session_id: str) -> None:
+        """✅ GOOD: JSONL loading only when user explicitly requests (F3)"""
+        if not self.user_requested_logs:
+            return  # No automatic loading
+            
+        # Background/async JSONL processing
+        await self.async_load_jsonl_content(session_id)
+```
+
+#### Hybrid Architecture: The Correct Balance ✅
+```python
+# UI Data Flow (Fast Path)
+Database (SQLite) → UI Components → Instant Display
+
+# Detail Data Flow (On-Demand Only)
+User F3 Press → Background JSONL Loading → Log Viewer → Optional Display
+```
+
+#### SQLite-First Architecture Benefits ✅
+- **Instant Chat Opening**: Database queries return immediately
+- **Responsive UI**: No I/O blocking during composition
+- **Scale Efficiency**: Database handles 416 sessions without performance loss
+- **Optional Detail**: JSONL data available when needed, not forced
+- **Background Sync**: JSONL files maintain perfect data integrity via WTE pipeline
+
+#### On-Demand Log Loading Pattern (CORRECT)
+```python
+class SessionLogViewer(Widget):
+    def __init__(self):
+        self.auto_load_disabled = True  # ✅ Never load automatically
+    
+    async def on_f3_pressed(self):
+        """✅ Only load logs when user explicitly requests"""
+        await self.background_load_jsonl(self.session_id)
+        
+    async def background_load_jsonl(self, session_id: str):
+        """✅ Non-blocking background processing"""
+        # Stream processing with progress indication
+        # Pagination for large files
+        # Graceful degradation if file unavailable
+```
 
 #### Session Intelligence Pattern
 ```python

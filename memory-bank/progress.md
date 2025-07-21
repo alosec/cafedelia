@@ -1,9 +1,9 @@
 # Progress
 
-## Current Status: WTE Pipeline Management Success
+## Current Status: Critical Performance Issue - Chat Opening Hangs
 **Date**: July 21, 2025  
-**Phase**: SYNC VALIDATION GUARD - Complete infrastructure for database-JSONL consistency
-**Next Phase**: Enhanced parsing for complex structured content in remaining 42 sessions
+**Phase**: PERFORMANCE CRISIS - Automatic JSONL loading causing UI hangs
+**Next Phase**: SQLite-first architecture pivot with lazy log loading
 
 ## Completed Milestones ✅
 
@@ -275,6 +275,38 @@ EliaChatModel(
 - **Deduplication**: Clean database with unique session_id constraints
 - **Performance**: Efficiently handles complete 416 session dataset across 14 projects
 - **Data Integrity**: Perfect JSONL-database consistency maintained
+
+#### 🚨 CRITICAL ISSUE: Chat Opening Performance Crisis (July 21, 2025)
+**Status**: Performance degradation due to automatic JSONL log loading
+
+###### ❌ Problem Identified
+- **Root Cause**: `ChatScreen._should_show_logs_by_default()` automatically loads SessionLogViewer for all sessions with session_id
+- **Impact**: Chat opens hang during JSONL file I/O operations (50KB+ file reads)
+- **Scope**: Affects all 416 synced sessions (any chat with session_id)
+- **User Experience**: UI becomes unresponsive during chat opening
+- **Architecture Issue**: JSONL files being used as UI data source instead of background sync source
+
+###### 🎯 Required Architecture Pivot
+1. **URGENT: Disable Automatic Log Loading**
+   - Remove automatic SessionLogViewer loading in ChatScreen.compose()
+   - Change `_should_show_logs_by_default()` to always return False
+   - Only show logs when user explicitly presses F3
+
+2. **SQLite-First UI Architecture**
+   - Use database as sole source for all chat display data
+   - Treat JSONL files as background sync source only
+   - Optimize database queries for instant chat opening
+
+3. **Optimized On-Demand Log Loading**
+   - Implement lazy loading for F3 log viewer
+   - Add streaming/pagination for large JSONL files
+   - Background processing for log content parsing
+
+###### 📊 Current State Analysis
+- **Total Database Entries**: 611 chats (416 with session_id + 195 legacy)
+- **JSONL Sync Status**: Perfect 100% for historical data
+- **Performance Problem**: SessionLogViewer I/O blocking main UI thread
+- **User Impact**: Chat opening completely unusable for sessions with logs
 
 ## Known Challenges and Solutions
 
