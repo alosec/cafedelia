@@ -1,5 +1,5 @@
 """
-Elia CLI
+Cafedelia CLI
 """
 
 import asyncio
@@ -42,7 +42,7 @@ def load_or_create_config_file() -> dict[str, Any]:
 
 @click.group(cls=DefaultGroup, default="default", default_if_no_args=True)
 def cli() -> None:
-    """Interact with large language models using your terminal."""
+    """Cafedelia - AI session management for terminal developers."""
 
 @cli.command()
 @click.argument("prompt", nargs=-1, type=str, required=False)

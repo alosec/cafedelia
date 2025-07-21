@@ -48,7 +48,7 @@ class EliaChatModel(BaseModel):
 def get_builtin_openai_models() -> list[EliaChatModel]:
     return [
         EliaChatModel(
-            id="elia-gpt-3.5-turbo",
+            id="cafedelia-gpt-3.5-turbo",
             name="gpt-3.5-turbo",
             display_name="GPT-3.5 Turbo",
             provider="OpenAI",
@@ -57,7 +57,7 @@ def get_builtin_openai_models() -> list[EliaChatModel]:
             temperature=0.7,
         ),
         EliaChatModel(
-            id="elia-gpt-4o",
+            id="cafedelia-gpt-4o",
             name="gpt-4o",
             display_name="GPT-4o",
             provider="OpenAI",
@@ -66,7 +66,7 @@ def get_builtin_openai_models() -> list[EliaChatModel]:
             temperature=0.7,
         ),
         EliaChatModel(
-            id="elia-gpt-4-turbo",
+            id="cafedelia-gpt-4-turbo",
             name="gpt-4-turbo",
             display_name="GPT-4 Turbo",
             provider="OpenAI",
@@ -80,7 +80,7 @@ def get_builtin_openai_models() -> list[EliaChatModel]:
 def get_builtin_anthropic_models() -> list[EliaChatModel]:
     return [
         EliaChatModel(
-            id="elia-claude-3-5-sonnet-20240620",
+            id="cafedelia-claude-3-5-sonnet-20240620",
             name="claude-3-5-sonnet-20240620",
             display_name="Claude 3.5 Sonnet",
             provider="Anthropic",
@@ -88,7 +88,7 @@ def get_builtin_anthropic_models() -> list[EliaChatModel]:
             description=("Anthropic's most intelligent model"),
         ),
         EliaChatModel(
-            id="elia-claude-3-haiku-20240307",
+            id="cafedelia-claude-3-haiku-20240307",
             name="claude-3-haiku-20240307",
             display_name="Claude 3 Haiku",
             provider="Anthropic",
@@ -98,7 +98,7 @@ def get_builtin_anthropic_models() -> list[EliaChatModel]:
             ),
         ),
         EliaChatModel(
-            id="elia-claude-3-sonnet-20240229",
+            id="cafedelia-claude-3-sonnet-20240229",
             name="claude-3-sonnet-20240229",
             display_name="Claude 3 Sonnet",
             provider="Anthropic",
@@ -108,7 +108,7 @@ def get_builtin_anthropic_models() -> list[EliaChatModel]:
             ),
         ),
         EliaChatModel(
-            id="elia-claude-3-opus-20240229",
+            id="cafedelia-claude-3-opus-20240229",
             name="claude-3-opus-20240229",
             display_name="Claude 3 Opus",
             provider="Anthropic",
@@ -121,7 +121,7 @@ def get_builtin_anthropic_models() -> list[EliaChatModel]:
 def get_builtin_google_models() -> list[EliaChatModel]:
     return [
         EliaChatModel(
-            id="elia-gemini/gemini-1.5-pro-latest",
+            id="cafedelia-gemini/gemini-1.5-pro-latest",
             name="gemini/gemini-1.5-pro-latest",
             display_name="Gemini 1.5 Pro",
             provider="Google",
@@ -130,7 +130,7 @@ def get_builtin_google_models() -> list[EliaChatModel]:
             "text editing, problem solving, data extraction and generation",
         ),
         EliaChatModel(
-            id="elia-gemini/gemini-1.5-flash-latest",
+            id="cafedelia-gemini/gemini-1.5-flash-latest",
             name="gemini/gemini-1.5-flash-latest",
             display_name="Gemini 1.5 Flash",
             provider="Google",
@@ -156,11 +156,11 @@ class LaunchConfig(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    default_model: str = Field(default="elia-gpt-4o")
+    default_model: str = Field(default="cafedelia-gpt-4o")
     """The ID or name of the default model."""
     system_prompt: str = Field(
         default=os.getenv(
-            "ELIA_SYSTEM_PROMPT", "You are a helpful assistant named Elia."
+            "CAFEDELIA_SYSTEM_PROMPT", "You are a helpful assistant named Cafedelia."
         )
     )
     message_code_theme: str = Field(default="monokai")

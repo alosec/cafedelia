@@ -1,7 +1,7 @@
 [project]
-name = "elia_chat"
-version = "1.10.0"
-description = "A powerful terminal user interface for interacting with large language models."
+name = "cafedelia"
+version = "0.0.1"
+description = "A powerful terminal user interface for AI session management and large language model interaction."
 authors = [
     { name = "Darren Burns", email = "darrenb900@gmail.com" }
 ]
@@ -23,7 +23,7 @@ readme = "README.md"
 requires-python = ">= 3.11"
 
 [project.scripts]
-elia = "elia_chat.__main__:cli"
+cafedelia = "elia_chat.__main__:cli"
 
 [build-system]
 requires = ["hatchling"]

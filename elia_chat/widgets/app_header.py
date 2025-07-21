@@ -42,8 +42,8 @@ class AppHeader(Widget):
         with Horizontal():
             with Vertical(id="cl-header-container"):
                 yield Label(
-                    Text("Elia") + Text(" v" + version("elia-chat"), style="dim"),
-                    id="elia-title",
+                    Text("Cafedelia") + Text(" v" + version("cafedelia"), style="dim"),
+                    id="cafedelia-title",
                 )
             model_name_or_id = (
                 self.elia.runtime_config.selected_model.id
