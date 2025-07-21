@@ -31,6 +31,7 @@ class SessionLogViewer(Widget):
         self._log_file_path: Optional[Path] = None
         self._tail_task: Optional[asyncio.Task] = None
         self._is_tailing = False
+        self._pending_content: list[str] = []  # Queue for content before mount
         
     def compose(self) -> ComposeResult:
         """Compose the log viewer UI."""
@@ -134,8 +135,19 @@ class SessionLogViewer(Widget):
                 file_size = self._log_file_path.stat().st_size
                 logger.info(f"_tail_file: File size: {file_size} bytes")
                 
+                # For large files, only read the last portion
+                max_initial_bytes = 50000  # 50KB initial load
+                
                 with open(self._log_file_path, 'r', encoding='utf-8') as f:
-                    existing_content = f.read()
+                    if file_size > max_initial_bytes:
+                        # Seek to near the end for large files
+                        f.seek(max(0, file_size - max_initial_bytes))
+                        # Read to end of current line to avoid partial JSON
+                        f.readline()
+                        existing_content = f"[...truncated {file_size - max_initial_bytes} bytes...]\n\n" + f.read()
+                    else:
+                        existing_content = f.read()
+                    
                     logger.info(f"_tail_file: Read {len(existing_content)} characters")
                     
                     if existing_content.strip():
@@ -188,11 +200,18 @@ class SessionLogViewer(Widget):
         """Append new content to the log viewer with JSON formatting."""
         logger.info(f"_append_content called with {len(content)} characters")
         
+        # Check if widget is mounted first
+        if not self.is_mounted:
+            logger.info("_append_content: Widget not mounted yet, queuing content")
+            self._pending_content.append(content)
+            return
+        
         try:
             log_area = self.query_one("#log-content", TextArea)
             logger.info(f"_append_content: Found TextArea widget")
         except Exception as e:
             logger.error(f"_append_content: Failed to find TextArea widget: {e}")
+            self._pending_content.append(content)  # Queue for later
             return
         
         # Parse and format each JSON line
@@ -243,6 +262,23 @@ class SessionLogViewer(Widget):
             header.update(message)
         except:
             pass  # Ignore if not mounted yet
+    
+    async def on_mount(self) -> None:
+        """Process pending content after widget is mounted."""
+        logger.info(f"SessionLogViewer mounted, processing {len(self._pending_content)} pending content items")
+        
+        # Process any pending content
+        if self._pending_content:
+            for content in self._pending_content:
+                self._append_content(content)
+            self._pending_content.clear()
+            
+        # Force a refresh of the TextArea
+        try:
+            log_area = self.query_one("#log-content", TextArea)
+            log_area.refresh()
+        except Exception as e:
+            logger.error(f"Failed to refresh TextArea: {e}")
     
     async def on_unmount(self) -> None:
         """Clean up when the widget is unmounted."""
