@@ -388,3 +388,10 @@ class Chatbox(Widget, can_focus=True):
             content += chunk
             self.message.message["content"] = content
             self.refresh(layout=True)
+    
+    def set_grouped_content(self, content: str, metadata: dict = None) -> None:
+        """Set complete grouped message content for coherent display."""
+        self.message.message["content"] = content
+        if metadata:
+            self.message.message.setdefault("meta", {}).update(metadata)
+        self.refresh(layout=True)

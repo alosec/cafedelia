@@ -88,6 +88,11 @@ class Chat(Widget):
     @dataclass
     class NewUserMessage(Message):
         content: str
+    
+    @dataclass
+    class SessionIdCaptured(Message):
+        """Sent when a Claude Code session ID is captured."""
+        session_id: str
 
     def compose(self) -> ComposeResult:
         yield ResponseStatus()
@@ -378,6 +383,7 @@ class Chat(Widget):
         """Handle streaming response from Claude Code SDK."""
         try:
             from sync.claude_process import session_manager
+            from sync.streaming_message_grouper import StreamingMessageGrouper
             
             # Get session ID and determine if we should resume
             session_id = self._extract_claude_session_id()
@@ -399,6 +405,10 @@ class Chat(Widget):
                 project_path
             )
             
+            # Emit session ID for log viewer
+            if actual_session_id:
+                self.post_message(self.SessionIdCaptured(actual_session_id))
+            
             # Create response message
             ai_message: ChatCompletionAssistantMessageParam = {
                 "content": "",
@@ -415,7 +425,8 @@ class Chat(Widget):
             self.post_message(self.AgentResponseStarted())
             self.app.call_from_thread(self.chat_container.mount, response_chatbox)
             
-            # Stream response from Claude Code SDK
+            # Initialize streaming message grouper for coherent UX
+            grouper = StreamingMessageGrouper()
             response_content = ""
             message_count = 0
             
@@ -426,49 +437,76 @@ class Chat(Widget):
             ):
                 message_count += 1
                 
-                # Handle different message types
+                # Handle system messages immediately
                 if claude_response.message_type == "system":
                     if "Session initialized" in claude_response.content:
                         response_chatbox.border_title = "Claude Code initializing..."
                         # Update session ID from system message
                         actual_session_id = claude_response.session_id
+                        
+                        # Emit updated session ID
+                        if actual_session_id:
+                            self.post_message(self.SessionIdCaptured(actual_session_id))
                     continue
                 
-                elif claude_response.message_type == "assistant":
-                    response_chatbox.border_title = "Claude Code is responding..."
-                    
-                    if claude_response.content:
-                        self.app.call_from_thread(
-                            response_chatbox.append_chunk, claude_response.content
-                        )
-                        response_content += claude_response.content
+                # Process response through grouper for coherent display
+                grouped_message = grouper.add_response(claude_response)
                 
-                elif claude_response.message_type == "result":
-                    # Final result with metadata
-                    response_chatbox.border_title = "Claude Code"
-                    
-                    # Add any remaining content
-                    if claude_response.content and claude_response.content not in response_content:
+                if grouped_message:
+                    # Complete grouped message ready for display
+                    if grouped_message.message_type == "system":
+                        # System messages display immediately
                         self.app.call_from_thread(
-                            response_chatbox.append_chunk, claude_response.content
+                            response_chatbox.set_grouped_content, 
+                            grouped_message.content, 
+                            grouped_message.metadata
                         )
-                        response_content += claude_response.content
                     
-                    # Log completion metadata
-                    metadata = claude_response.metadata
-                    if metadata.get('total_cost_usd'):
-                        log.info(f"Claude Code session {actual_session_id} completed. "
-                               f"Cost: ${metadata['total_cost_usd']:.4f}, "
-                               f"Turns: {metadata.get('num_turns', 0)}, "
-                               f"Duration: {metadata.get('duration_ms', 0)}ms")
+                    elif grouped_message.message_type == "assistant":
+                        # Grouped assistant content with tool calls/results
+                        response_chatbox.border_title = "Claude Code"
+                        self.app.call_from_thread(
+                            response_chatbox.set_grouped_content,
+                            grouped_message.content,
+                            grouped_message.metadata
+                        )
+                        response_content = grouped_message.content
                     
+                    elif grouped_message.message_type == "result":
+                        # Final result message - log completion and break
+                        metadata = grouped_message.metadata
+                        if metadata.get('total_cost_usd'):
+                            log.info(f"Claude Code session {actual_session_id} completed. "
+                                   f"Cost: ${metadata['total_cost_usd']:.4f}, "
+                                   f"Turns: {metadata.get('num_turns', 0)}, "
+                                   f"Duration: {metadata.get('duration_ms', 0)}ms")
+                        break
+                
+                else:
+                    # Still building group - update status
+                    if claude_response.message_type == "assistant":
+                        response_chatbox.border_title = "Claude Code is responding..."
+                    elif claude_response.message_type == "result":
+                        response_chatbox.border_title = "Claude Code processing..."
+                
+                # Handle completion and errors
+                if claude_response.message_type == "result" and claude_response.is_complete:
+                    # Force complete any remaining group
+                    final_group = grouper.force_complete_group()
+                    if final_group:
+                        self.app.call_from_thread(
+                            response_chatbox.set_grouped_content,
+                            final_group.content,
+                            final_group.metadata
+                        )
+                        response_content = final_group.content
                     break
                 
                 elif claude_response.message_type == "error":
-                    # Handle errors
+                    # Handle errors immediately
                     response_chatbox.border_title = "Claude Code Error"
                     self.app.call_from_thread(
-                        response_chatbox.append_chunk, claude_response.content
+                        response_chatbox.set_grouped_content, claude_response.content
                     )
                     break
                 
@@ -486,6 +524,10 @@ class Chat(Widget):
                     self.chat_data.meta = {}
                 self.chat_data.meta['session_id'] = actual_session_id
                 self.chat_data.meta['claude_code_session'] = True
+            
+            # Ensure the message content is updated with final response
+            if response_content:
+                response_chatbox.message.message["content"] = response_content
             
             # Mark as complete
             self.post_message(

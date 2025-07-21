@@ -86,6 +86,11 @@ class ChatHeader(Widget):
 
     def model_static_content(self) -> str:
         model = self.model
+        # Show session ID for Claude Code sessions if available
+        if hasattr(self.chat, 'meta') and self.chat.meta and self.chat.meta.get('claude_code_session'):
+            session_id = self.chat.meta.get('session_id')
+            if session_id:
+                return f"Claude Code: {session_id[:8]}..."  # Show first 8 chars of session ID
         return escape(model.display_name or model.name) if model else "Unknown model"
 
     def compose(self) -> ComposeResult:
