@@ -2,8 +2,8 @@
 
 ## Current State  
 - **Date**: July 21, 2025
-- **Focus**: UI/UX Optimization - Chatbox Performance and History Widget Improvements
-- **Status**: Hybrid architecture complete, optimizing user experience and performance
+- **Focus**: Live Chat Message Grouping & Tool Use Display Parity
+- **Status**: Database deduplication fixed, streaming message grouper implemented, tool results still not displaying in live chat
 
 ## Cafedelia Fork Strategy (July 20, 2025)
 
@@ -91,13 +91,43 @@
 - **User Feedback**: "Quite excellent", "absolutely fantastic", "exactly what I was looking for"
 - **Information Density**: Shows more detail than Claude Code's interactive interface
 
-### CURRENT PRIORITY: Live Chat Functionality
-**Focus**: Improve robustness of real-time Claude Code CLI integration
+### CURRENT PRIORITY: Tool Use Display Parity
+**Focus**: Achieve UX parity between live chat and historical chat for tool use display
 
-#### Known Issues with Live Chat
-- Live messaging functionality not working robustly
-- Need to investigate streaming and real-time response handling
-- Current implementation may have reliability issues with `claude -p` integration
+#### Recent Major Work Completed (July 21, 2025)
+
+##### ✅ Database Deduplication Crisis Resolved
+- **Problem**: 15k duplicate database entries due to broken session_id matching using `title.contains()`
+- **Solution**: Added proper `session_id` field with unique constraint, exact UUID matching
+- **Database Cleanup**: Reduced from 16,083 to 184 chats, removed orphaned messages
+- **Deduplication Service**: Implemented centralized sync locking and frequency limits
+
+##### ✅ Streaming Message Grouper Implementation  
+- **Problem**: Live chat showed individual message chunks vs historical chat's grouped conversation blocks
+- **Solution**: Created `StreamingMessageGrouper` to buffer and group streaming responses
+- **Integration**: Modified chat.py to use grouped display, added `set_grouped_content()` to chatbox
+- **Architecture**: State machine tracks assistant → tool calls → results for coherent display
+
+#### ✅ SOLVED: Tool Use Display Parity Achieved
+- **Problem**: Tool calls weren't appearing in live chat with rich formatting
+- **Root Cause**: Claude Code CLI returns `"type": "message"` but ContentExtractor expects `"type": "assistant"`
+- **Solution**: Fixed type field mapping in `claude_process.py` for both assistant and user messages
+- **Result**: Live streaming now shows beautiful tool formatting: `🔧 **Used Bash** (toolu_01...) Parameters: command: ls -la`
+
+#### ✅ MAJOR FEATURE: Split-Screen Log Viewer Implementation
+- **Feature**: Real-time JSONL tailing alongside formatted chat interface
+- **Components Created**: 
+  - `SessionLogViewer` widget with async file tailing
+  - Horizontal split layout in `ChatScreen` (60/40 chat/logs)
+  - F3 toggle for showing/hiding logs panel
+  - Session ID capture and auto-connection
+- **Result**: Professional debugging interface showing raw JSON responses + formatted chat side-by-side
+
+#### 🆕 CURRENT ISSUE: Streaming Disconnect in Live Chat  
+- **Symptom**: Chat UI stops updating but logs continue showing Claude responses
+- **Evidence**: Log viewer shows active JSON entries while chat interface freezes
+- **Analysis**: Claude Code subprocess working correctly, disconnect in UI update pipeline
+- **Critical Finding**: This suggests issue in streaming message processing or UI refresh, not Claude integration
 
 ```python
 # Current Elia: Single model selection

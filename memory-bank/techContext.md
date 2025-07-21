@@ -66,12 +66,12 @@ rich = ">=13.0.0"              # Text rendering (Textual dependency)
 litellm = ">=1.0.0"            # LLM API abstraction (for API providers)
 ```
 
-#### New Dependencies (CLI Provider Support)
+#### Implemented Dependencies (CLI Provider Support)
 ```toml
-# Additional dependencies for CLI provider functionality
-libtmux = ">=0.30.0"           # Tmux session management
-aiofiles = ">=24.1.0"          # Async file operations for session discovery
-psutil = ">=5.9.0"             # Process monitoring for session health
+# Current dependencies for Claude Code CLI integration
+aiofiles = ">=24.1.0"          # Async file operations for JSONL parsing
+psutil = ">=5.9.0"             # Process monitoring for CLI sessions
+# Note: libtmux removed - using direct CLI integration instead
 ```
 
 #### Development Dependencies
@@ -146,8 +146,12 @@ source .venv/bin/activate
 # Install dependencies
 pip install -e .
 
-# Install development dependencies
-pip install -e .[dev]
+# Install globally with pipx (recommended)
+pipx uninstall cafedelia  # Remove previous version
+pipx install -e .         # Install from development directory
+
+# Database location
+~/.local/share/cafedelia/cafedelia.sqlite  # Correct database path
 ```
 
 #### Development Prerequisites
@@ -163,17 +167,17 @@ pip install pre-commit           # Git hooks for code quality
 
 #### Running Cafedelia
 ```bash
-# Development mode
+# Development mode (current)
 python -m elia_chat
 
-# Production installation
+# Production installation (planned)
 cafedelia
 
-# With specific CLI provider
-cafedelia --provider claude-code
+# With Claude Code integration (implemented)
+python -m elia_chat  # Auto-detects Claude Code sessions
 
-# Attach to existing session
-cafedelia --resume session-abc123
+# Performance debugging
+python -m elia_chat --debug  # For investigating parsing issues
 ```
 
 ### Development Patterns
@@ -271,20 +275,34 @@ tests/
 
 ### Performance Considerations
 
-#### Session Discovery Optimization
-- Cache session metadata to avoid repeated filesystem scans
-- Use file system watching for real-time session updates
-- Lazy loading of session details until user interaction
+#### Database Deduplication (FIXED) ✅
+**Previous Issue**: 15k duplicate database entries causing massive bloat
+- **Root Cause**: Broken `title.contains()` session matching with race conditions
+- **Solution Implemented**: 
+  - Added `session_id` field with unique constraint
+  - Centralized deduplication service with sync locking
+  - Database migration and cleanup (16,083 → 184 chats)
+- **Result**: Clean, efficient database with proper deduplication
 
-#### Tmux Integration Efficiency
-- Connection pooling for tmux session management
-- Background session health monitoring
-- Efficient terminal output capture and processing
+#### Message Parsing Efficiency (IMPROVED) ✅ 
+**Previous Issue**: Blank agent messages from failed tool parsing
+- **Solution Implemented**: 
+  - Unified `ContentExtractor` class for consistent parsing
+  - Rich tool call extraction with parameters and formatting
+  - Streaming message grouper for coherent conversation display
+- **Current Issue**: Tool results still not displaying in live chat despite fixes
+
+#### Session Discovery Optimization (STABLE)
+**Current Status**: JSONL file parsing and SQLite sync working well
+- **Implemented**: Efficient session discovery from `~/.claude/projects/`
+- **Performance**: Handles ~2000 sessions effectively with database caching
+- **Future Need**: Pagination/lazy loading for UI optimization when session count grows
 
 #### Memory Management
-- Limit concurrent CLI sessions to prevent resource exhaustion
-- Clean up inactive sessions based on configurable timeout
-- Stream processing for large session outputs
+- **Current**: Direct CLI process management without tmux
+- **Needed**: Limit concurrent CLI sessions to prevent resource exhaustion
+- **Needed**: Stream processing optimization for large responses
+- **Needed**: Database query optimization for session metadata
 
 ### Security Considerations
 

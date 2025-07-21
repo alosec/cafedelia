@@ -1,8 +1,8 @@
 # Progress
 
-## Current Status: UI/UX Performance Optimization
+## Current Status: Live Chat Tool Use Display Parity
 **Date**: July 21, 2025  
-**Phase**: Chatbox and History Widget Performance Improvements  
+**Phase**: Achieving UX consistency between live and historical chat tool display  
 **Next Phase**: Advanced Session Management Features
 
 ## Completed Milestones ✅
@@ -147,18 +147,63 @@ EliaChatModel(
 - `_extract_tool_result_content()`: Formats results with proper truncation and metadata
 - Enhanced content presentation with emoji indicators and code formatting
 
-### CURRENT: Live Chat Functionality Robustness (Week 1)
-**Focus**: Improve real-time Claude Code CLI integration reliability
+### CURRENT: Live Chat Tool Use Display Parity (July 21, 2025)
+**Focus**: Achieve UX consistency between live and historical chat for tool use
 
-**Critical Issues Identified**:
-1. **Live Chat Reliability**: Real-time messaging functionality not working robustly
-2. **Performance Bottleneck**: Loading ~2000 sessions causes UI sluggishness
-3. **History Widget Overload**: No pagination or lazy loading for session browsing
+#### ✅ Major Technical Achievements Completed Today
 
-### Next Implementation Steps (Week 1)
-1. **Fix Live Chat Integration**: Debug and improve `claude -p` streaming reliability
-2. **Implement Lazy Loading**: Add pagination to History widget for session browsing
-3. **Optimize Session Discovery**: Cache session metadata and implement progressive loading
+##### Database Deduplication Crisis Resolved ✅
+- **Problem**: 15k duplicate database entries from broken `title.contains()` session matching
+- **Root Cause**: Race conditions, no unique constraints, aggressive sync triggers
+- **Solution Implemented**:
+  - Added `session_id` field to ChatDao with unique constraint 
+  - Fixed deduplication logic to use exact UUID matching
+  - Created centralized `DeduplicationService` with sync locking
+  - Database migration script with automatic cleanup
+- **Result**: Database reduced from 16,083 to 184 chats, duplicates eliminated
+- **Database Location**: `~/.local/share/cafedelia/cafedelia.sqlite` (corrected path)
+
+##### Streaming Message Grouper Implementation ✅ 
+- **Problem**: Live chat showing individual message chunks vs historical chat's grouped blocks
+- **Architecture**: Created state machine-based `StreamingMessageGrouper`
+  - Buffers streaming responses into coherent conversation units
+  - Groups assistant reasoning + tool calls + results together
+  - Uses same content extraction logic as historical chat
+- **Integration**: 
+  - Modified `chat.py` to use message grouper instead of `append_chunk`
+  - Added `set_grouped_content()` method to chatbox for complete message display
+  - Preserved streaming responsiveness with proper status updates
+- **Files Created**: `sync/streaming_message_grouper.py`, updated chatbox display logic
+
+##### Content Extraction Unification ✅
+- **Problem**: Live and historical chat using different content parsing logic
+- **Solution**: Created unified `ContentExtractor` class
+  - Consolidated tool use parsing from historical transformer
+  - Applied same rich formatting to live streaming
+  - Ensures consistent tool call display with parameters and results
+- **Files Created**: `sync/content_extractor.py`
+
+##### ✅ Tool Use Display Parity ACHIEVED ✅
+- **Problem**: Tool calls missing rich formatting in live streaming
+- **Root Cause**: Type field mismatch (`"type": "message"` vs `"type": "assistant"`)
+- **Solution**: Fixed content extraction in `claude_process.py` to normalize message types
+- **Result**: Live streaming now displays beautiful tool formatting identical to historical chat
+- **Verification**: Created `test_claude_direct.py` CLI testing utility for non-interactive debugging
+
+##### ✅ Split-Screen Log Viewer IMPLEMENTED ✅
+- **Feature**: Real-time JSONL file tailing alongside formatted chat interface
+- **Components**:
+  - `elia_chat/widgets/session_log_viewer.py` - Async file tailing with JSON formatting
+  - `elia_chat/screens/chat_screen.py` - Horizontal split layout (F3 toggle)
+  - Session ID capture and automatic connection to log viewer
+  - Professional CSS styling for debugging interface
+- **Result**: Side-by-side view of formatted chat + raw JSON responses for comprehensive debugging
+
+#### 🆕 CURRENT ISSUE: Live Chat Streaming Disconnect (July 21, 2025)
+- **Critical Discovery**: Chat UI stops updating while logs continue showing Claude responses
+- **Evidence**: Log viewer shows active JSON streaming while chat interface freezes
+- **Analysis**: Claude Code subprocess working correctly, issue in UI update pipeline
+- **Implications**: Problem isolated to streaming message processing or Textual UI refresh mechanism
 
 ## Known Challenges and Solutions
 

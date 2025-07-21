@@ -126,50 +126,107 @@ class HomeScreen(Screen[None]):
 
 ### Claude Code Integration Patterns
 
-#### Session Discovery Pattern
+#### Session Discovery Pattern (IMPLEMENTED)
 ```python
-class ClaudeCodeProvider(CLIProvider):
-    async def discover_sessions(self) -> list[ClaudeCodeSession]:
-        # Scan ~/.config/claude-code/sessions/
-        session_dir = Path.home() / ".config/claude-code/sessions"
+class JSONLWatcher:
+    """Discovers Claude Code sessions from JSONL files."""
+    
+    async def discover_sessions(self) -> list[ClaudeSession]:
+        # Scan ~/.claude/projects/ for JSONL files
+        projects_dir = Path.home() / ".claude/projects"
         sessions = []
         
-        for session_file in session_dir.glob("*.json"):
-            metadata = self.parse_session_metadata(session_file)
-            sessions.append(ClaudeCodeSession(
-                id=metadata.id,
-                project=metadata.project,
-                last_activity=metadata.last_activity,
-                git_branch=metadata.git_branch
-            ))
+        for project_dir in projects_dir.iterdir():
+            if project_dir.is_dir():
+                for session_file in project_dir.glob("*.jsonl"):
+                    try:
+                        session = await self.parse_jsonl_session(session_file)
+                        sessions.append(session)
+                    except Exception as e:
+                        logger.warning(f"Failed to parse session {session_file}: {e}")
         
         return sessions
+
+    async def parse_jsonl_session(self, file_path: Path) -> ClaudeSession:
+        """Parse JSONL file to extract session metadata."""
+        # Parse first few lines for metadata, last lines for recent activity
+        # Implement lazy loading to avoid reading entire large files
 ```
 
-#### Tmux Integration Pattern
+#### Claude Code CLI Integration Pattern (IMPLEMENTED) ✅
 ```python
-class TmuxSessionWidget(Widget):
-    """Embeds tmux session within Textual interface."""
+class ClaudeCodeSession:
+    """Direct Claude Code CLI integration with rich content extraction."""
     
-    def __init__(self, session_name: str, command: str):
-        self.session_name = session_name
-        self.command = command
-    
-    async def on_mount(self) -> None:
-        if await self.session_exists():
-            await self.attach_session()
-        else:
-            await self.create_session()
-            
-    async def create_session(self) -> None:
-        # tmux new-session -d -s {session_name} {command}
-        await asyncio.create_subprocess_exec(
-            "tmux", "new-session", "-d", "-s", self.session_name, self.command
-        )
+    async def send_message(self, message: str, resume_session: bool = False) -> AsyncGenerator[ClaudeCodeResponse, None]:
+        # Build Claude Code command with structured JSON output
+        cmd = ["claude", "-p", "--verbose", "--output-format", "stream-json"]
         
-    async def attach_session(self) -> None:
-        # Embed tmux session in current terminal area
-        # Use tmux's terminal control features
+        if resume_session and self.session_id:
+            cmd.extend(["--resume", self.session_id])
+        
+        cmd.append(message)
+        
+        # Stream JSON responses directly from CLI
+        async for response in self._read_streaming_json():
+            yield response
+
+    def _extract_message_content(self, message_obj: Dict[str, Any]) -> str:
+        """Extract content using unified ContentExtractor for rich tool display."""
+        # IMPLEMENTED: Uses ContentExtractor.extract_message_content() for consistency
+        return ContentExtractor.extract_message_content(message_obj)
+```
+
+#### Streaming Message Grouping Pattern (NEW) ✅
+```python
+class StreamingMessageGrouper:
+    """Groups streaming responses into coherent conversation blocks."""
+    
+    def add_response(self, response: ClaudeCodeResponse) -> Optional[GroupedMessage]:
+        """Add streaming response and return complete grouped message if ready."""
+        
+        if response.message_type == "assistant":
+            return self._handle_assistant_response(response)
+        elif response.message_type == "user":
+            return self._handle_user_response(response)  # Tool results
+        elif response.message_type == "result":
+            return self._handle_result_response(response)  # Completion
+    
+    def _finalize_current_group(self) -> Optional[GroupedMessage]:
+        """Convert buffered responses into formatted GroupedMessage."""
+        formatted_content = self._format_group_content()
+        metadata = self._extract_group_metadata()
+        
+        return GroupedMessage(
+            content=formatted_content,
+            message_type="assistant", 
+            metadata=metadata,
+            is_complete=True
+        )
+```
+
+#### Content Extraction Unification Pattern (NEW) ✅
+```python
+class ContentExtractor:
+    """Unified content extraction for live and historical chat."""
+    
+    @staticmethod
+    def extract_message_content(message_data: Dict[str, Any]) -> str:
+        """Universal content extraction with tool support."""
+        msg_type = message_data.get('type', '')
+        
+        if msg_type == "assistant":
+            return ContentExtractor.extract_assistant_content(message_data)
+        elif msg_type == "user":
+            # Check for tool results first
+            tool_results = ContentExtractor.extract_tool_result_content(message_data)
+            return tool_results if tool_results else extract_user_content(message_data)
+    
+    @staticmethod  
+    def extract_assistant_content(message_data: Dict[str, Any]) -> List[str]:
+        """Extract reasoning + tool calls with rich formatting."""
+        # Processes tool_use blocks: 🔧 **Used Read** (`toolu_01...`) Parameters: file_path: /test
+        # Same logic as historical transformer for consistency
 ```
 
 #### Session Intelligence Pattern
@@ -236,30 +293,94 @@ max_concurrent_sessions = 5
 session_timeout = 3600  # 1 hour
 ```
 
-### Database Extension Patterns
+### Performance Optimization Patterns
 
-#### Session Tracking Schema
+#### Lazy Loading for Session Discovery
+```python
+class LazySessionLoader:
+    """Implements pagination and lazy loading for large session datasets."""
+    
+    def __init__(self, page_size: int = 50):
+        self.page_size = page_size
+        self.cache = {}
+    
+    async def load_sessions_page(self, page: int = 0) -> list[SessionInfo]:
+        """Load sessions in pages to avoid UI overload."""
+        cache_key = f"sessions_page_{page}"
+        
+        if cache_key in self.cache:
+            return self.cache[cache_key]
+        
+        offset = page * self.page_size
+        sessions = await self.discover_sessions_with_limit(offset, self.page_size)
+        
+        self.cache[cache_key] = sessions
+        return sessions
+    
+    async def search_sessions(self, query: str) -> list[SessionInfo]:
+        """Implement session filtering and search."""
+        # TODO: Add search by project, date, content
+        pass
+
+class MessageParsingOptimizer:
+    """Handles complex Claude Code message parsing."""
+    
+    def parse_tool_calls(self, message_content: dict) -> str:
+        """Parse tool calls that were causing blank messages."""
+        # TODO: Extract tool names and parameters
+        # Handle <function_calls> blocks
+        pass
+    
+    def parse_tool_results(self, result_data: dict) -> str:
+        """Parse tool execution results."""
+        # TODO: Format tool results for display
+        pass
+```
+
+#### Database Extension Patterns (IMPLEMENTED) ✅
 ```sql
--- Extend Elia's existing database with CLI session tracking
-CREATE TABLE cli_sessions (
-    id TEXT PRIMARY KEY,
-    provider TEXT NOT NULL,
-    session_name TEXT NOT NULL,
-    project_path TEXT,
-    git_branch TEXT,
-    status TEXT DEFAULT 'active',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    last_activity TIMESTAMP,
-    intelligence_summary TEXT
-);
+-- Enhanced chat table with proper session deduplication
+-- FIXED: Added session_id field with unique constraint to prevent duplicates
+ALTER TABLE chat ADD COLUMN session_id VARCHAR(255) NULL;
+CREATE UNIQUE INDEX idx_chat_session_id ON chat(session_id) WHERE session_id IS NOT NULL;
 
-CREATE TABLE session_intelligence (
-    session_id TEXT REFERENCES cli_sessions(id),
-    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    summary_type TEXT,  -- 'progress', 'error', 'completion'
-    summary_content TEXT,
-    confidence_score REAL
+-- Migration for cleanup and deduplication
+-- Reduces 16k+ duplicate entries to clean dataset
+DELETE FROM chat WHERE id NOT IN (
+    SELECT MIN(id) FROM chat GROUP BY title  -- Keep earliest per title
 );
+DELETE FROM message WHERE chat_id NOT IN (SELECT id FROM chat);  -- Remove orphans
+```
+
+#### Deduplication Service Pattern (NEW) ✅
+```python
+class DeduplicationService:
+    """Thread-safe session synchronization preventing race conditions."""
+    
+    @asynccontextmanager
+    async def sync_session(self, session_id: str, session_timestamp: float):
+        """Context manager for safe session synchronization."""
+        should_sync = await self.should_sync_session(session_id, session_timestamp)
+        
+        if not should_sync:
+            yield False
+            return
+        
+        async with self.sync_lock.acquire_session_lock(session_id):
+            await self.mark_sync_start(session_id)
+            try:
+                yield True
+                await self.mark_sync_complete(session_id, session_timestamp, success=True)
+            except Exception as e:
+                await self.mark_sync_complete(session_id, session_timestamp, success=False)
+                raise
+
+# Usage in JSONLTransformer
+async def sync_session_to_database(self, session: ClaudeSession, messages: List[dict]):
+    async with deduplication_service.sync_session(session.session_id, session.last_updated) as should_sync:
+        if should_sync:
+            # Perform actual sync with guaranteed uniqueness
+            pass
 ```
 
 ### Integration Points Summary
