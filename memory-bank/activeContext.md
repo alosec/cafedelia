@@ -1,9 +1,9 @@
 # Active Context
 
 ## Current State  
-- **Date**: July 20, 2025
-- **Focus**: Cafedelia Setup - Memory Bank Creation and Architecture Foundation
-- **Status**: Project initialization complete, beginning implementation planning
+- **Date**: July 21, 2025
+- **Focus**: Hybrid Architecture Implementation - JSONL Sync + Live Claude Code Integration
+- **Status**: Reverted to clean foundation, implementing dual-mode architecture
 
 ## Cafedelia Fork Strategy (July 20, 2025)
 
@@ -49,13 +49,33 @@
 
 ## Current Development Focus
 
-### Immediate Priority: Memory Bank Setup
-**Status**: In Progress - Creating foundational documentation
-- [x] Project brief adapted for Elia fork approach
-- [x] Product context explaining the gap Cafedelia fills
-- [ ] System patterns for Elia extension architecture  
-- [ ] Technical context for development setup
-- [ ] Progress tracking for implementation phases
+### CRITICAL DISCOVERY: Claude Code Data Architecture Change (July 21, 2025)
+**Major Finding**: Claude Code abandoned SQLite (`~/.claude/__store.db`) in favor of per-project JSONL files (`~/.claude/projects/[project]/[session-id].jsonl`)
+- Our direct database integration was reading **deprecated data** (only sessions from May 2025)
+- **Current sessions live in JSONL format** with rich metadata and real-time updates
+- **Architecture pivot required**: Hybrid approach combining JSONL sync + live Claude Code integration
+
+### Hybrid Architecture IMPLEMENTED ✅
+**Browse Mode**: JSONL → SQLite sync for historical sessions (319 sessions discovered)  
+**Live Mode**: Claude Code CLI integration with `claude -p --output-format stream-json`
+
+**CLI Integration Features**:
+- Uses Claude Code subscription billing (no API key required)
+- Structured JSON streaming: `claude -p --output-format stream-json`
+- Session resumption: `claude -p --resume session_id`
+- Proper message parsing according to Claude Code schema
+- Real-time streaming with cost/timing metadata
+
+### Current Priority: Dual-Mode Implementation
+**Status**: COMPLETE - Hybrid architecture fully implemented
+- [x] Git revert to clean cafedelia.sqlite foundation (commit 9b0f54d)
+- [x] Memory bank updated with new hybrid approach  
+- [x] Create sync directory structure for JSONL processing
+- [x] Implement Claude Code CLI wrapper for live chat (uses subscription billing)
+- [x] Build JSONL watcher and transformer for historical data
+- [x] CLI-based integration with `claude -p --output-format stream-json`
+- [x] Session resumption with `claude -p --resume session_id`
+- [x] Structured JSON parsing according to Claude Code message schema
 
 ### Next Development Phase: Provider Type Implementation
 **Target**: Extend Elia's OptionsModal for API vs CLI provider selection

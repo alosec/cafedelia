@@ -1,9 +1,9 @@
 # Progress
 
-## Current Status: Foundation Complete
-**Date**: July 20, 2025  
-**Phase**: Project Initialization and Architecture Design  
-**Next Phase**: Provider Type Implementation
+## Current Status: Architecture Pivot Complete
+**Date**: July 21, 2025  
+**Phase**: Hybrid Architecture Implementation (JSONL Sync + Live Chat)  
+**Next Phase**: Dual-Mode Session Management
 
 ## Completed Milestones ✅
 
@@ -29,10 +29,30 @@
 
 ## Current Implementation Status
 
-### Phase 1: Provider Type Separation (Ready to Start)
-**Target**: Extend OptionsModal for API vs CLI provider selection
+### ARCHITECTURE DISCOVERY & PIVOT (July 21, 2025) ✅
 
-#### Extension Points Identified ✅
+#### Critical Finding: Claude Code Data Migration
+- **Discovery**: Claude Code abandoned SQLite database in favor of JSONL files
+- **Impact**: Previous direct database integration was reading deprecated data (May 2025 only)
+- **Current Reality**: Active sessions stored in `~/.claude/projects/[project]/[session-id].jsonl`
+- **Required Pivot**: Hybrid architecture combining JSONL sync + live chat integration
+
+#### Strategic Response: Dual-Mode Architecture ✅
+- **Browse Mode**: JSONL → SQLite sync for historical session browsing
+- **Live Mode**: Direct `claude -p --resume-by-session-id` for real-time interaction
+- **Foundation**: Reverted to clean cafedelia.sqlite (commit 9b0f54d)
+
+### Phase 1: Hybrid Architecture Implementation (COMPLETE) ✅
+**Target**: Build JSONL sync + Claude Code live chat integration
+
+#### CLI Integration Success ✅
+- **Claude Code CLI**: Uses `claude -p --output-format stream-json` for real-time streaming
+- **Session Management**: Supports `claude -p --resume session_id` for continuation
+- **Message Parsing**: Proper JSON schema parsing (system, user, assistant, result)
+- **Subscription Billing**: Works with Claude Code subscription (no API key required)
+- **Structured Metadata**: Cost tracking, timing, model info, working directory context
+
+#### Foundation Restoration ✅
 - **EliaChatModel**: Add provider_type, cli_command, session_manager fields
 - **OptionsModal**: Inject provider type selection UI before model list
 - **HomeScreen**: Add routing logic for CLI vs API providers
