@@ -108,14 +108,16 @@ class JSONLTransformer:
         return chat_dao.id
     
     async def _add_messages_to_chat(self, db_session, chat_id: int, messages: List[dict]) -> None:
-        """Add messages to a chat."""
-        for msg_data in messages:
+        """Add messages to a chat, grouping related tool calls and results."""
+        grouped_messages = self._group_related_messages(messages)
+        
+        for group in grouped_messages:
             try:
-                message_dao = self._convert_jsonl_message(msg_data, chat_id)
+                message_dao = self._convert_message_group(group, chat_id)
                 if message_dao:
                     db_session.add(message_dao)
             except Exception as e:
-                logger.warning(f"Error converting message: {e}")
+                logger.warning(f"Error converting message group: {e}")
                 continue
     
     def _convert_jsonl_message(self, jsonl_data: dict, chat_id: int) -> Optional[MessageDao]:
@@ -123,13 +125,51 @@ class JSONLTransformer:
         try:
             # Extract message content based on type
             message_type = jsonl_data.get('type', 'unknown')
-            role = 'assistant' if message_type == 'assistant' else 'user'
+            
+            # Enhanced role assignment logic
+            if message_type == 'summary':
+                role = 'system'
+            elif message_type == 'assistant':
+                role = 'assistant'
+            elif message_type == 'user':
+                role = 'user'
+            elif 'toolUseResult' in jsonl_data or 'toolResult' in jsonl_data:
+                # Tool results are typically from user context
+                role = 'user'
+            else:
+                # Default to user for unknown types
+                role = 'user'
             
             # Extract content from various JSONL formats
             content = self._extract_content(jsonl_data)
-            if not content and role == 'user':
-                # Skip empty user messages
-                return None
+            
+            # Enhanced empty message handling
+            if not content:
+                if role == 'user':
+                    # Skip completely empty user messages
+                    return None
+                elif role == 'assistant':
+                    # For assistant messages, check if this might be a tool-only message
+                    if 'message' in jsonl_data:
+                        msg = jsonl_data['message']
+                        if isinstance(msg, dict) and 'content' in msg:
+                            if isinstance(msg['content'], list):
+                                # Check if it's all tool_use with no text
+                                has_tool_use = any(
+                                    item.get('type') == 'tool_use' 
+                                    for item in msg['content'] 
+                                    if isinstance(item, dict)
+                                )
+                                if has_tool_use:
+                                    content = "[Assistant used tools]"
+                                else:
+                                    return None
+                            else:
+                                return None
+                        else:
+                            return None
+                    else:
+                        return None
             
             # Create timestamp
             timestamp_str = jsonl_data.get('timestamp', '')
@@ -166,41 +206,261 @@ class JSONLTransformer:
     
     def _extract_content(self, jsonl_data: dict) -> str:
         """Extract readable content from JSONL message data."""
-        # Try various content fields
+        content_parts = []
+        
+        # Handle message content arrays properly
         if 'message' in jsonl_data:
             msg = jsonl_data['message']
-            if isinstance(msg, dict):
-                # Standard message format
-                if 'content' in msg:
-                    content = msg['content']
-                    if isinstance(content, str):
-                        return content
-                    elif isinstance(content, list):
-                        # Handle content arrays (text + attachments)
-                        text_parts = []
-                        for item in content:
-                            if isinstance(item, dict) and item.get('type') == 'text':
-                                text_parts.append(item.get('text', ''))
-                        return '\n'.join(text_parts)
+            if isinstance(msg, dict) and 'content' in msg:
+                content = msg['content']
+                if isinstance(content, str):
+                    return content
+                elif isinstance(content, list):
+                    # Handle structured content arrays
+                    for item in content:
+                        if isinstance(item, dict):
+                            item_type = item.get('type', '')
+                            if item_type == 'text':
+                                text = item.get('text', '')
+                                if text:
+                                    content_parts.append(text)
+                            elif item_type == 'tool_use':
+                                # Include tool use information
+                                tool_name = item.get('name', 'unknown')
+                                tool_id = item.get('id', '')[:8] + '...' if item.get('id') else ''
+                                content_parts.append(f"[Used tool: {tool_name} ({tool_id})]")
+                            elif item_type == 'tool_result':
+                                # Include tool results
+                                result_content = item.get('content', '')
+                                if isinstance(result_content, str) and result_content:
+                                    # Truncate very long results
+                                    if len(result_content) > 500:
+                                        result_content = result_content[:500] + "..."
+                                    content_parts.append(f"[Tool result: {result_content}]")
+                                elif isinstance(result_content, dict):
+                                    content_parts.append(f"[Tool result: {str(result_content)[:200]}...]")
             elif isinstance(msg, str):
                 return msg
         
         # Try direct content field
-        if 'content' in jsonl_data:
+        if 'content' in jsonl_data and not content_parts:
             return str(jsonl_data['content'])
         
         # Try summary field (for conversation summaries)
-        if 'summary' in jsonl_data:
+        if 'summary' in jsonl_data and not content_parts:
             return str(jsonl_data['summary'])
         
-        # Handle tool results
-        if 'toolResult' in jsonl_data:
+        # Handle toolUseResult field (correct field name)
+        if 'toolUseResult' in jsonl_data:
+            tool_result = jsonl_data['toolUseResult']
+            if isinstance(tool_result, dict):
+                result = tool_result.get('result', '')
+                if result:
+                    # Truncate very long results
+                    if len(str(result)) > 500:
+                        result = str(result)[:500] + "..."
+                    content_parts.append(f"[Tool execution result: {result}]")
+                elif 'url' in tool_result:
+                    content_parts.append(f"[Tool executed on: {tool_result['url']}]")
+            else:
+                content_parts.append(f"[Tool result: {str(tool_result)[:200]}...]")
+        
+        # Handle legacy toolResult field for backward compatibility
+        if 'toolResult' in jsonl_data and not content_parts:
             tool_result = jsonl_data['toolResult']
             if isinstance(tool_result, dict):
-                return f"Tool Result: {tool_result.get('output', str(tool_result))}"
-            return f"Tool Result: {tool_result}"
+                result = tool_result.get('output', str(tool_result))
+                content_parts.append(f"[Legacy tool result: {str(result)[:200]}...]")
+            else:
+                content_parts.append(f"[Legacy tool result: {str(tool_result)[:200]}...]")
         
-        return ''
+        return '\n'.join(content_parts) if content_parts else ''
+    
+    def _group_related_messages(self, messages: List[dict]) -> List[List[dict]]:
+        """Group related messages (assistant + tool results) for coherent conversation flow."""
+        groups = []
+        current_group = []
+        
+        for msg in messages:
+            msg_type = msg.get('type', '')
+            
+            # Start new group for user messages (except tool results)
+            if msg_type == 'user' and 'toolUseResult' not in msg and current_group:
+                if current_group:
+                    groups.append(current_group)
+                current_group = [msg]
+            
+            # Start new group for assistant messages
+            elif msg_type == 'assistant':
+                if current_group:
+                    groups.append(current_group)
+                current_group = [msg]
+            
+            # Add tool results to current group (they follow assistant tool use)
+            elif msg_type == 'user' and 'toolUseResult' in msg and current_group:
+                current_group.append(msg)
+            
+            # Handle other message types
+            else:
+                if not current_group:
+                    current_group = [msg]
+                else:
+                    current_group.append(msg)
+        
+        # Add final group
+        if current_group:
+            groups.append(current_group)
+        
+        return groups
+    
+    def _convert_message_group(self, group: List[dict], chat_id: int) -> Optional[MessageDao]:
+        """Convert a group of related messages into a single MessageDao."""
+        if not group:
+            return None
+        
+        primary_msg = group[0]
+        msg_type = primary_msg.get('type', '')
+        
+        # Determine role from primary message
+        if msg_type == 'summary':
+            role = 'system'
+        elif msg_type == 'assistant':
+            role = 'assistant'
+        elif msg_type == 'user':
+            role = 'user'
+        else:
+            role = 'user'
+        
+        # Build content from all messages in group
+        content_parts = []
+        
+        for msg in group:
+            if msg.get('type') == 'assistant':
+                content_parts.extend(self._extract_assistant_content(msg))
+            elif msg.get('type') == 'user' and 'toolUseResult' in msg:
+                content_parts.extend(self._extract_tool_result_content(msg))
+            elif msg.get('type') == 'user':
+                user_content = self._extract_content(msg)
+                if user_content:
+                    content_parts.append(user_content)
+            elif msg.get('type') == 'summary':
+                summary_content = msg.get('summary', '')
+                if summary_content:
+                    content_parts.append(summary_content)
+        
+        if not content_parts:
+            return None
+        
+        # Use timestamp from primary message
+        timestamp_str = primary_msg.get('timestamp', '')
+        try:
+            timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+        except:
+            timestamp = datetime.now()
+        
+        # Extract metadata from primary message
+        metadata = {
+            'session_id': primary_msg.get('sessionId', ''),
+            'working_directory': primary_msg.get('cwd', ''),
+            'git_branch': primary_msg.get('gitBranch', ''),
+            'claude_version': primary_msg.get('version', ''),
+            'message_count': len(group),
+            'uuid': primary_msg.get('uuid', ''),
+            'parent_uuid': primary_msg.get('parentUuid', ''),
+        }
+        
+        return MessageDao(
+            chat_id=chat_id,
+            role=role,
+            content='\n\n'.join(content_parts),
+            timestamp=timestamp,
+            meta=metadata,
+            model=self.claude_code_model.id
+        )
+    
+    def _extract_assistant_content(self, msg: dict) -> List[str]:
+        """Extract content from assistant message, including reasoning and tool calls."""
+        content_parts = []
+        
+        if 'message' in msg and 'content' in msg['message']:
+            content = msg['message']['content']
+            if isinstance(content, list):
+                text_parts = []
+                tool_parts = []
+                
+                for item in content:
+                    if isinstance(item, dict):
+                        item_type = item.get('type', '')
+                        if item_type == 'text':
+                            text = item.get('text', '').strip()
+                            if text:
+                                text_parts.append(text)
+                        elif item_type == 'tool_use':
+                            tool_name = item.get('name', 'unknown')
+                            tool_input = item.get('input', {})
+                            tool_id = item.get('id', '')[:8] + '...' if item.get('id') else ''
+                            
+                            # Format tool call nicely
+                            tool_desc = f"🔧 **Used {tool_name}** (`{tool_id}`)"
+                            if tool_input:
+                                # Show key parameters (truncated for readability)
+                                key_params = []
+                                for key, value in tool_input.items():
+                                    if isinstance(value, str) and len(value) > 100:
+                                        value = value[:100] + "..."
+                                    key_params.append(f"{key}: {value}")
+                                if key_params:
+                                    tool_desc += f"\n  Parameters: {', '.join(key_params[:3])}"
+                            tool_parts.append(tool_desc)
+                
+                # Combine text and tool parts
+                if text_parts:
+                    content_parts.extend(text_parts)
+                if tool_parts:
+                    content_parts.extend(tool_parts)
+            
+            elif isinstance(content, str):
+                content_parts.append(content)
+        
+        return content_parts
+    
+    def _extract_tool_result_content(self, msg: dict) -> List[str]:
+        """Extract and format tool result content."""
+        content_parts = []
+        
+        if 'toolUseResult' in msg:
+            tool_result = msg['toolUseResult']
+            result_text = tool_result.get('result', '')
+            
+            if result_text:
+                # Truncate very long results but show more than before
+                if len(result_text) > 1000:
+                    result_text = result_text[:1000] + "\n\n[... truncated ...]"
+                
+                result_part = f"📋 **Tool Result:**\n```\n{result_text}\n```"
+                
+                # Add metadata if available
+                if 'url' in tool_result:
+                    result_part += f"\n*Source: {tool_result['url']}*"
+                if 'durationMs' in tool_result:
+                    duration = tool_result['durationMs']
+                    result_part += f" *({duration}ms)*"
+                
+                content_parts.append(result_part)
+        
+        # Also check for tool results in message content
+        if 'message' in msg and 'content' in msg['message']:
+            content = msg['message']['content']
+            if isinstance(content, list):
+                for item in content:
+                    if isinstance(item, dict) and item.get('type') == 'tool_result':
+                        result_content = item.get('content', '')
+                        if result_content:
+                            if len(result_content) > 1000:
+                                result_content = result_content[:1000] + "\n\n[... truncated ...]"
+                            content_parts.append(f"📋 **Tool Result:**\n```\n{result_content}\n```")
+        
+        return content_parts
     
     def _generate_chat_title(self, messages: List[dict], session: ClaudeSession) -> str:
         """Generate a readable title for the chat."""
