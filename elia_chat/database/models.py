@@ -52,6 +52,7 @@ class ChatDao(AsyncAttrs, SQLModel, table=True):
     __tablename__ = "chat"
 
     id: int = Field(default=None, primary_key=True)
+    session_id: str | None = Field(default=None, unique=True, index=True)
     model: str
     title: str | None
     started_at: datetime | None = Field(
@@ -81,6 +82,39 @@ class ChatDao(AsyncAttrs, SQLModel, table=True):
             )
             results = await session.exec(statement)
             return list(results)
+
+    @staticmethod
+    async def paginated(limit: int = 50, offset: int = 0) -> list["ChatDao"]:
+        """Get chats with pagination support for performance with large datasets."""
+        async with get_session() as session:
+            # Create a subquery that finds the maximum
+            # (most recent) timestamp for each chat.
+            max_timestamp: Any = func.max(MessageDao.timestamp).label("max_timestamp")
+            subquery = (
+                select(MessageDao.chat_id, max_timestamp)
+                .group_by(MessageDao.chat_id)
+                .alias("subquery")
+            )
+
+            statement = (
+                select(ChatDao)
+                .join(subquery, subquery.c.chat_id == ChatDao.id)
+                .where(ChatDao.archived == False)  # noqa: E712
+                .order_by(desc(subquery.c.max_timestamp))
+                .options(selectinload(ChatDao.messages))
+                .limit(limit)
+                .offset(offset)
+            )
+            results = await session.exec(statement)
+            return list(results)
+
+    @staticmethod
+    async def count_all() -> int:
+        """Get total count of non-archived chats for pagination."""
+        async with get_session() as session:
+            statement = select(func.count(ChatDao.id)).where(ChatDao.archived == False)  # noqa: E712
+            result = await session.exec(statement)
+            return result.one()
 
     @staticmethod
     async def from_id(chat_id: int) -> "ChatDao":

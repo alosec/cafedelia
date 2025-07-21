@@ -24,6 +24,17 @@ class ChatsManager:
         return [chat_dao_to_chat_data(chat) for chat in chat_daos]
 
     @staticmethod
+    async def paginated_chats(limit: int = 50, offset: int = 0) -> list[ChatData]:
+        """Get chats with pagination for better performance with large datasets."""
+        chat_daos = await ChatDao.paginated(limit=limit, offset=offset)
+        return [chat_dao_to_chat_data(chat) for chat in chat_daos]
+
+    @staticmethod
+    async def count_chats() -> int:
+        """Get total count of chats for pagination calculations."""
+        return await ChatDao.count_all()
+
+    @staticmethod
     async def get_chat(chat_id: int) -> ChatData:
         chat_dao = await ChatDao.from_id(chat_id)
         return chat_dao_to_chat_data(chat_dao)
