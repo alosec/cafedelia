@@ -72,6 +72,14 @@ class Elia(App[None]):
         self.runtime_config_signal.publish(self.runtime_config)
 
     async def on_mount(self) -> None:
+        # Initialize sync service for Claude Code JSONL integration
+        try:
+            from sync.service import sync_service
+            await sync_service.start()
+        except Exception as e:
+            # Log but don't fail if sync service can't start
+            self.log.warning(f"Could not start sync service: {e}")
+        
         await self.push_screen(HomeScreen(self.runtime_config_signal))
         self.theme = self.launch_config.theme
         if self.startup_prompt:
@@ -139,6 +147,14 @@ class Elia(App[None]):
             return self.themes[self.theme]
         except KeyError:
             return None
+    
+    async def on_shutdown(self) -> None:
+        """Clean shutdown of sync service."""
+        try:
+            from sync.service import sync_service
+            await sync_service.stop()
+        except Exception as e:
+            self.log.warning(f"Error stopping sync service: {e}")
 
 
 if __name__ == "__main__":

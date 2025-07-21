@@ -140,11 +140,26 @@ def get_builtin_google_models() -> list[EliaChatModel]:
     ]
 
 
+def get_builtin_claude_code_models() -> list[EliaChatModel]:
+    """Get built-in Claude Code models for CLI provider integration."""
+    return [
+        EliaChatModel(
+            id="claude-code",
+            name="claude-code",
+            display_name="Claude Code Session",
+            provider="Claude Code",
+            product="Claude Code",
+            description="Live Claude Code session integration with project context",
+        ),
+    ]
+
+
 def get_builtin_models() -> list[EliaChatModel]:
     return (
         get_builtin_openai_models()
         + get_builtin_anthropic_models()
         + get_builtin_google_models()
+        + get_builtin_claude_code_models()
     )
 
 

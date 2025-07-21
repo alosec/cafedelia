@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 from textual.widgets import Label
@@ -157,6 +158,11 @@ class Chat(Widget):
     async def stream_agent_response(self) -> None:
         model = self.chat_data.model
         log.debug(f"Creating streaming response with model {model.name!r}")
+
+        # Check if this is a Claude Code session
+        if self._is_claude_code_session():
+            await self._stream_claude_code_response()
+            return
 
         import litellm
         from litellm import ModelResponse, acompletion
@@ -328,6 +334,177 @@ class Chat(Widget):
 
     async def action_details(self) -> None:
         await self.app.push_screen(ChatDetails(self.chat_data))
+
+    def _is_claude_code_session(self) -> bool:
+        """Check if this is a Claude Code session."""
+        # Check if model provider is Claude Code
+        if hasattr(self.model, 'provider') and self.model.provider == "Claude Code":
+            return True
+        
+        # Check if chat title contains session ID pattern
+        if self.chat_data.title and len(self.chat_data.title.split('-')) >= 5:
+            # Looks like a UUID pattern
+            return True
+        
+        # Check if chat metadata indicates Claude Code session
+        if hasattr(self.chat_data, 'meta') and self.chat_data.meta:
+            return 'session_id' in self.chat_data.meta
+        
+        return False
+    
+    def _extract_claude_session_id(self) -> str:
+        """Extract Claude Code session ID from chat data."""
+        # Try to extract from metadata first
+        if hasattr(self.chat_data, 'meta') and self.chat_data.meta:
+            session_id = self.chat_data.meta.get('session_id')
+            if session_id:
+                return session_id
+        
+        # Try to extract from chat ID if it looks like a UUID
+        if isinstance(self.chat_data.id, str) and len(self.chat_data.id.split('-')) >= 5:
+            return self.chat_data.id
+        
+        # Fallback: try to extract from title
+        if self.chat_data.title:
+            parts = self.chat_data.title.split()
+            for part in parts:
+                if len(part.split('-')) >= 5:  # UUID-like pattern
+                    return part
+        
+        # If no session ID found, this might be a new session
+        return str(self.chat_data.id) if self.chat_data.id else "new"
+    
+    async def _stream_claude_code_response(self) -> None:
+        """Handle streaming response from Claude Code SDK."""
+        try:
+            from sync.claude_process import session_manager
+            
+            # Get session ID and determine if we should resume
+            session_id = self._extract_claude_session_id()
+            should_resume = session_id != "new" and session_id != str(self.chat_data.id)
+            
+            log.debug(f"Streaming Claude Code response for session: {session_id} (resume: {should_resume})")
+            
+            # Get the last user message
+            user_message = self.chat_data.messages[-1].message.get("content", "")
+            if not user_message:
+                log.error("No user message content found")
+                self.post_message(self.AgentResponseFailed(self.chat_data.messages[-1]))
+                return
+            
+            # Get or create session with current project path
+            project_path = str(Path.cwd())  # Use current directory as project path
+            actual_session_id = await session_manager.get_or_create_session(
+                session_id if should_resume else None, 
+                project_path
+            )
+            
+            # Create response message
+            ai_message: ChatCompletionAssistantMessageParam = {
+                "content": "",
+                "role": "assistant",
+            }
+            now = datetime.datetime.now(datetime.timezone.utc)
+            
+            message = ChatMessage(message=ai_message, model=self.model, timestamp=now)
+            response_chatbox = Chatbox(
+                message=message,
+                model=self.chat_data.model,
+                classes="response-in-progress",
+            )
+            self.post_message(self.AgentResponseStarted())
+            self.app.call_from_thread(self.chat_container.mount, response_chatbox)
+            
+            # Stream response from Claude Code SDK
+            response_content = ""
+            message_count = 0
+            
+            async for claude_response in session_manager.send_message(
+                actual_session_id, 
+                user_message, 
+                resume=should_resume
+            ):
+                message_count += 1
+                
+                # Handle different message types
+                if claude_response.message_type == "system":
+                    if "Session initialized" in claude_response.content:
+                        response_chatbox.border_title = "Claude Code initializing..."
+                        # Update session ID from system message
+                        actual_session_id = claude_response.session_id
+                    continue
+                
+                elif claude_response.message_type == "assistant":
+                    response_chatbox.border_title = "Claude Code is responding..."
+                    
+                    if claude_response.content:
+                        self.app.call_from_thread(
+                            response_chatbox.append_chunk, claude_response.content
+                        )
+                        response_content += claude_response.content
+                
+                elif claude_response.message_type == "result":
+                    # Final result with metadata
+                    response_chatbox.border_title = "Claude Code"
+                    
+                    # Add any remaining content
+                    if claude_response.content and claude_response.content not in response_content:
+                        self.app.call_from_thread(
+                            response_chatbox.append_chunk, claude_response.content
+                        )
+                        response_content += claude_response.content
+                    
+                    # Log completion metadata
+                    metadata = claude_response.metadata
+                    if metadata.get('total_cost_usd'):
+                        log.info(f"Claude Code session {actual_session_id} completed. "
+                               f"Cost: ${metadata['total_cost_usd']:.4f}, "
+                               f"Turns: {metadata.get('num_turns', 0)}, "
+                               f"Duration: {metadata.get('duration_ms', 0)}ms")
+                    
+                    break
+                
+                elif claude_response.message_type == "error":
+                    # Handle errors
+                    response_chatbox.border_title = "Claude Code Error"
+                    self.app.call_from_thread(
+                        response_chatbox.append_chunk, claude_response.content
+                    )
+                    break
+                
+                # Auto-scroll for all message types
+                scroll_y = self.chat_container.scroll_y
+                max_scroll_y = self.chat_container.max_scroll_y
+                if scroll_y in range(max_scroll_y - 3, max_scroll_y + 1):
+                    self.app.call_from_thread(
+                        self.chat_container.scroll_end, animate=False
+                    )
+            
+            # Update chat data with session ID for future reference
+            if hasattr(self.chat_data, 'meta'):
+                if not self.chat_data.meta:
+                    self.chat_data.meta = {}
+                self.chat_data.meta['session_id'] = actual_session_id
+                self.chat_data.meta['claude_code_session'] = True
+            
+            # Mark as complete
+            self.post_message(
+                self.AgentResponseComplete(
+                    chat_id=self.chat_data.id,
+                    message=response_chatbox.message,
+                    chatbox=response_chatbox,
+                )
+            )
+            
+        except Exception as e:
+            log.error(f"Error in Claude Code SDK streaming: {e}")
+            self.app.notify(
+                f"Claude Code SDK error: {e}",
+                title="Claude Code Error",
+                severity="error",
+                timeout=constants.ERROR_NOTIFY_TIMEOUT_SECS,
+            )
+            self.post_message(self.AgentResponseFailed(self.chat_data.messages[-1]))
 
     async def load_chat(self, chat_data: ChatData) -> None:
         chatboxes = [
