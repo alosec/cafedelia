@@ -238,6 +238,7 @@ class Chatbox(Widget, can_focus=True):
         """Sent when the cursor moves down from the bottom message."""
 
     selection_mode = reactive(False, init=False)
+    content = reactive("", layout=True)  # Reactive content for automatic UI updates
 
     def __init__(
         self,
@@ -256,6 +257,9 @@ class Chatbox(Widget, can_focus=True):
         )
         self.message = message
         self.model = model
+        # Initialize reactive content from message
+        msg_content = message.message.get("content", "")
+        self.content = msg_content if isinstance(msg_content, str) else ""
 
     def on_mount(self) -> None:
         litellm_message = self.message.message
@@ -282,8 +286,8 @@ class Chatbox(Widget, can_focus=True):
 
     def action_copy_to_clipboard(self) -> None:
         if not self.selection_mode:
-            text_to_copy = self.message.message.get("content")
-            if isinstance(text_to_copy, str):
+            text_to_copy = self.content
+            if text_to_copy:
                 try:
                     import pyperclip
 
@@ -306,9 +310,8 @@ class Chatbox(Widget, can_focus=True):
         if value:
             async with self.batch():
                 self.border_subtitle = "SELECT"
-                content = self.message.message.get("content")
                 text_area = SelectionTextArea(
-                    content if isinstance(content, str) else "",
+                    self.content,
                     read_only=True,
                     language="markdown",
                     classes="selection-mode",
@@ -349,11 +352,7 @@ class Chatbox(Widget, can_focus=True):
     @property
     def markdown(self) -> Markdown:
         """Return the content as a Rich Markdown object."""
-        content = self.message.message.get("content")
-        if not isinstance(content, str):
-            content = ""
-
-        return Markdown(content, code_theme=self.app.launch_config.message_code_theme)
+        return Markdown(self.content, code_theme=self.app.launch_config.message_code_theme)
 
     def render(self) -> RenderableType:
         if self.selection_mode:
@@ -369,29 +368,22 @@ class Chatbox(Widget, can_focus=True):
             background_color = "#121212"
 
         if message["role"] == "user":
-            content = message["content"] or ""
-            if isinstance(content, str):
-                return Syntax(
-                    content,
-                    lexer="markdown",
-                    word_wrap=True,
-                    background_color=background_color,
-                )
-            else:
-                return ""
+            return Syntax(
+                self.content,
+                lexer="markdown",
+                word_wrap=True,
+                background_color=background_color,
+            )
         return self.markdown
 
     def append_chunk(self, chunk: str) -> None:
         """Append a chunk of text to the end of the message."""
-        content = self.message.message.get("content")
-        if isinstance(content, str):
-            content += chunk
-            self.message.message["content"] = content
-            self.refresh(layout=True)
+        self.content += chunk  # Reactive update triggers refresh automatically
+        self.message.message["content"] = self.content
     
     def set_grouped_content(self, content: str, metadata: dict = None) -> None:
         """Set complete grouped message content for coherent display."""
+        self.content = content  # Reactive update triggers refresh automatically
         self.message.message["content"] = content
         if metadata:
             self.message.message.setdefault("meta", {}).update(metadata)
-        self.refresh(layout=True)
