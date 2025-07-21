@@ -36,6 +36,7 @@ def chat_dao_to_chat_data(chat_dao: ChatDao) -> ChatData:
         messages=[
             message_dao_to_chat_message(message, model) for message in chat_dao.messages
         ],
+        session_id=chat_dao.session_id,
     )
 
 

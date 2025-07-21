@@ -40,8 +40,16 @@ class ChatListItemRenderable:
             subtitle += f" [i]by[/] {escape(model.provider)}"
         model_text = Text.from_markup(subtitle)
         title = self.chat.title or self.chat.short_preview.replace("\n", " ")
+        
+        # Add session_id if available
+        parts = [title, "\n", model_text]
+        if self.chat.session_id:
+            session_id_text = Text(self.chat.session_id, style="dim cyan")
+            parts.extend(["\n", session_id_text])
+        parts.extend(["\n", time_ago_text])
+        
         yield Padding(
-            Text.assemble(title, "\n", model_text, "\n", time_ago_text),
+            Text.assemble(*parts),
             pad=(0, 0, 0, 1),
         )
 

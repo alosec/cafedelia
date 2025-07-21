@@ -50,6 +50,7 @@ class ChatData:
     title: str | None
     create_timestamp: datetime | None
     messages: list[ChatMessage]
+    session_id: str | None = None
 
     @property
     def short_preview(self) -> str:
