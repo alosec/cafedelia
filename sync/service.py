@@ -10,6 +10,7 @@ from typing import Optional
 
 from sync.jsonl_watcher import watcher, SessionUpdate
 from sync.jsonl_transformer import transformer
+from sync.deduplication_service import deduplication_service
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,9 @@ class SyncService:
         
         logger.info("Starting Cafedelia sync service")
         self.is_running = True
+        
+        # Reset deduplication counters on startup
+        await deduplication_service.reset_sync_counts()
         
         # Start the watcher task
         self.watcher_task = asyncio.create_task(self._watch_and_sync())

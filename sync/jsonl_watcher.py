@@ -14,6 +14,8 @@ from typing import AsyncGenerator, Dict, List, Optional
 import time
 import hashlib
 
+from .deduplication_service import deduplication_service
+
 logger = logging.getLogger(__name__)
 
 
@@ -155,9 +157,17 @@ class JSONLWatcher:
             try:
                 current_sessions = self.discover_sessions()
                 
-                # Check for new or updated sessions
+                # Check for new or updated sessions with deduplication
                 for session in current_sessions:
                     cached_session = self.session_cache.get(session.session_id)
+                    
+                    # Use deduplication service to check if we should process this session
+                    should_process = await deduplication_service.should_sync_session(
+                        session.session_id, session.last_updated
+                    )
+                    
+                    if not should_process:
+                        continue
                     
                     if not cached_session:
                         # New session
@@ -202,9 +212,9 @@ class JSONLWatcher:
         
         # Find the JSONL file for this session
         project_dir = self.projects_dir / session.project_path
-        for jsonl_file in project_dir.glob("*.jsonl"):
-            if session_id in jsonl_file.name:
-                return self._parse_messages_from_file(jsonl_file)
+        jsonl_file = project_dir / f"{session_id}.jsonl"
+        if jsonl_file.exists():
+            return self._parse_messages_from_file(jsonl_file)
         
         return []
     

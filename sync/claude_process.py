@@ -14,6 +14,8 @@ from pathlib import Path
 from typing import AsyncGenerator, Optional, Dict, Any
 import uuid
 
+from .content_extractor import ContentExtractor
+
 logger = logging.getLogger(__name__)
 
 
@@ -25,6 +27,7 @@ class ClaudeCodeResponse:
     metadata: Dict[str, Any]
     message_type: str  # 'user', 'assistant', 'system', 'result'
     is_complete: bool = False
+    raw_message_data: Optional[Dict[str, Any]] = None  # Store raw data for rich formatting
 
 
 class ClaudeCodeSession:
@@ -205,27 +208,37 @@ class ClaudeCodeSession:
             
             elif message_type == "user":
                 # User message (for context)
-                content = self._extract_message_content(message_data.get('message', {}))
+                raw_message = message_data.get('message', {})
+                # Add missing type field for ContentExtractor
+                content = ContentExtractor.extract_message_content({
+                    'type': 'user',
+                    **raw_message
+                })
                 
                 return ClaudeCodeResponse(
                     content=content,
                     session_id=message_data.get('session_id', self.session_id),
                     metadata={},
-                    message_type="user"
+                    message_type="user",
+                    raw_message_data={'type': 'user', **raw_message}
                 )
             
             elif message_type == "assistant":
                 # Assistant response message
-                content = self._extract_message_content(message_data.get('message', {}))
+                raw_message = message_data.get('message', {})
+                # Override the "type": "message" with "type": "assistant" for ContentExtractor
+                corrected_message = {**raw_message, 'type': 'assistant'}
+                content = ContentExtractor.extract_message_content(corrected_message)
                 
                 return ClaudeCodeResponse(
                     content=content,
                     session_id=message_data.get('session_id', self.session_id),
                     metadata={
-                        "model": message_data.get('message', {}).get('model', 'unknown'),
-                        "usage": message_data.get('message', {}).get('usage', {}),
+                        "model": raw_message.get('model', 'unknown'),
+                        "usage": raw_message.get('usage', {}),
                     },
-                    message_type="assistant"
+                    message_type="assistant",
+                    raw_message_data=corrected_message
                 )
             
             elif message_type == "result":
@@ -259,23 +272,9 @@ class ClaudeCodeSession:
             return None
     
     def _extract_message_content(self, message_obj: Dict[str, Any]) -> str:
-        """Extract text content from Claude Code message object."""
-        content = message_obj.get('content', '')
-        
-        if isinstance(content, str):
-            return content
-        elif isinstance(content, list):
-            # Handle content blocks (text, images, etc.)
-            text_parts = []
-            for block in content:
-                if isinstance(block, dict):
-                    if block.get('type') == 'text' and 'text' in block:
-                        text_parts.append(block['text'])
-                    elif 'text' in block:
-                        text_parts.append(block['text'])
-            return '\n'.join(text_parts)
-        
-        return str(content) if content else ''
+        """Extract content from Claude Code message with comprehensive tool support."""
+        # Use the unified content extractor for rich tool display
+        return ContentExtractor.extract_message_content(message_obj)
 
 
 class ClaudeCodeSessionManager:

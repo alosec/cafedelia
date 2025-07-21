@@ -15,6 +15,8 @@ from elia_chat.database.models import ChatDao, MessageDao
 from elia_chat.database.database import get_session
 from elia_chat.models import ChatMessage, get_model
 from sync.jsonl_watcher import ClaudeSession
+from sync.content_extractor import ContentExtractor
+from sync.deduplication_service import deduplication_service
 
 logger = logging.getLogger(__name__)
 
@@ -43,32 +45,39 @@ class JSONLTransformer:
             )
     
     async def sync_session_to_database(self, session: ClaudeSession, messages: List[dict]) -> Optional[int]:
-        """Sync a Claude Code session to Elia database."""
-        try:
-            async with get_session() as db_session:
-                # Check if chat already exists
-                existing_chat = await self._find_existing_chat(db_session, session.session_id)
+        """Sync a Claude Code session to Elia database with proper deduplication."""
+        # Use deduplication service for thread-safe sync
+        async with deduplication_service.sync_session(session.session_id, session.last_updated) as should_sync:
+            if not should_sync:
+                logger.debug(f"Skipping sync for session {session.session_id} - deduplication check failed")
+                return None
                 
-                if existing_chat:
-                    # Update existing chat
-                    chat_id = await self._update_existing_chat(db_session, existing_chat, session, messages)
-                else:
-                    # Create new chat
-                    chat_id = await self._create_new_chat(db_session, session, messages)
-                
-                await db_session.commit()
-                return chat_id
-                
-        except Exception as e:
-            logger.error(f"Error syncing session {session.session_id} to database: {e}")
-            return None
+            try:
+                async with get_session() as db_session:
+                    # Check if chat already exists
+                    existing_chat = await self._find_existing_chat(db_session, session.session_id)
+                    
+                    if existing_chat:
+                        # Update existing chat
+                        chat_id = await self._update_existing_chat(db_session, existing_chat, session, messages)
+                    else:
+                        # Create new chat
+                        chat_id = await self._create_new_chat(db_session, session, messages)
+                    
+                    await db_session.commit()
+                    logger.info(f"Successfully synced session {session.session_id} (chat_id: {chat_id})")
+                    return chat_id
+                    
+            except Exception as e:
+                logger.error(f"Error syncing session {session.session_id} to database: {e}")
+                raise  # Re-raise to trigger deduplication service failure handling
     
     async def _find_existing_chat(self, db_session, session_id: str) -> Optional[ChatDao]:
-        """Find existing chat by session ID (stored in title or metadata)."""
+        """Find existing chat by exact session ID match."""
         from sqlmodel import select
         
-        # Look for chats with matching session ID in title
-        statement = select(ChatDao).where(ChatDao.title.contains(session_id))
+        # Use exact session_id field matching for proper deduplication
+        statement = select(ChatDao).where(ChatDao.session_id == session_id)
         result = await db_session.exec(statement)
         return result.first()
     
@@ -79,6 +88,7 @@ class JSONLTransformer:
         
         # Create ChatDao
         chat_dao = ChatDao(
+            session_id=session.session_id,
             model=self.claude_code_model.id,
             title=title,
             started_at=datetime.fromtimestamp(session.last_updated)
@@ -380,87 +390,15 @@ class JSONLTransformer:
     
     def _extract_assistant_content(self, msg: dict) -> List[str]:
         """Extract content from assistant message, including reasoning and tool calls."""
-        content_parts = []
-        
-        if 'message' in msg and 'content' in msg['message']:
-            content = msg['message']['content']
-            if isinstance(content, list):
-                text_parts = []
-                tool_parts = []
-                
-                for item in content:
-                    if isinstance(item, dict):
-                        item_type = item.get('type', '')
-                        if item_type == 'text':
-                            text = item.get('text', '').strip()
-                            if text:
-                                text_parts.append(text)
-                        elif item_type == 'tool_use':
-                            tool_name = item.get('name', 'unknown')
-                            tool_input = item.get('input', {})
-                            tool_id = item.get('id', '')[:8] + '...' if item.get('id') else ''
-                            
-                            # Format tool call nicely
-                            tool_desc = f"🔧 **Used {tool_name}** (`{tool_id}`)"
-                            if tool_input:
-                                # Show key parameters (truncated for readability)
-                                key_params = []
-                                for key, value in tool_input.items():
-                                    if isinstance(value, str) and len(value) > 100:
-                                        value = value[:100] + "..."
-                                    key_params.append(f"{key}: {value}")
-                                if key_params:
-                                    tool_desc += f"\n  Parameters: {', '.join(key_params[:3])}"
-                            tool_parts.append(tool_desc)
-                
-                # Combine text and tool parts
-                if text_parts:
-                    content_parts.extend(text_parts)
-                if tool_parts:
-                    content_parts.extend(tool_parts)
-            
-            elif isinstance(content, str):
-                content_parts.append(content)
-        
-        return content_parts
+        # Use shared content extractor for consistency
+        content_text = ContentExtractor.extract_message_content({'type': 'assistant', **msg})
+        return [content_text] if content_text else []
     
     def _extract_tool_result_content(self, msg: dict) -> List[str]:
         """Extract and format tool result content."""
-        content_parts = []
-        
-        if 'toolUseResult' in msg:
-            tool_result = msg['toolUseResult']
-            result_text = tool_result.get('result', '')
-            
-            if result_text:
-                # Truncate very long results but show more than before
-                if len(result_text) > 1000:
-                    result_text = result_text[:1000] + "\n\n[... truncated ...]"
-                
-                result_part = f"📋 **Tool Result:**\n```\n{result_text}\n```"
-                
-                # Add metadata if available
-                if 'url' in tool_result:
-                    result_part += f"\n*Source: {tool_result['url']}*"
-                if 'durationMs' in tool_result:
-                    duration = tool_result['durationMs']
-                    result_part += f" *({duration}ms)*"
-                
-                content_parts.append(result_part)
-        
-        # Also check for tool results in message content
-        if 'message' in msg and 'content' in msg['message']:
-            content = msg['message']['content']
-            if isinstance(content, list):
-                for item in content:
-                    if isinstance(item, dict) and item.get('type') == 'tool_result':
-                        result_content = item.get('content', '')
-                        if result_content:
-                            if len(result_content) > 1000:
-                                result_content = result_content[:1000] + "\n\n[... truncated ...]"
-                            content_parts.append(f"📋 **Tool Result:**\n```\n{result_content}\n```")
-        
-        return content_parts
+        # Use shared content extractor for consistency
+        results = ContentExtractor.extract_tool_result_content(msg)
+        return results
     
     def _generate_chat_title(self, messages: List[dict], session: ClaudeSession) -> str:
         """Generate a readable title for the chat."""
