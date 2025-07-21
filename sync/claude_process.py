@@ -41,8 +41,8 @@ class ClaudeCodeSession:
         try:
             self.is_active = True
             
-            # Build Claude Code command
-            cmd = ["claude", "-p", "--output-format", "stream-json"]
+            # Build Claude Code command (--verbose required for stream-json)
+            cmd = ["claude", "-p", "--verbose", "--output-format", "stream-json"]
             
             # Add resume option if we have a session ID
             if resume_session and self.session_id:
@@ -53,12 +53,15 @@ class ClaudeCodeSession:
             
             logger.info(f"Running Claude Code command: {' '.join(cmd[:4])} [message] (cwd: {self.project_path})")
             
-            # Start the Claude Code process
-            self.process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                cwd=self.project_path
+            # Start the Claude Code process with timeout
+            self.process = await asyncio.wait_for(
+                asyncio.create_subprocess_exec(
+                    *cmd,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    cwd=self.project_path
+                ),
+                timeout=10.0  # 10 second timeout for process startup
             )
             
             # Read streaming JSON responses
@@ -69,6 +72,15 @@ class ClaudeCodeSession:
                 if response.is_complete:
                     break
                         
+        except asyncio.TimeoutError:
+            logger.error("Claude Code CLI process startup timeout")
+            yield ClaudeCodeResponse(
+                content="Error: Claude Code CLI process startup timeout",
+                session_id=self.session_id or "unknown",
+                metadata={"error": True, "timeout": True},
+                message_type="error",
+                is_complete=True
+            )
         except Exception as e:
             logger.error(f"Error in Claude Code CLI execution: {e}")
             yield ClaudeCodeResponse(
@@ -80,42 +92,90 @@ class ClaudeCodeSession:
             )
         finally:
             self.is_active = False
-            if self.process:
-                try:
-                    self.process.terminate()
-                    await self.process.wait()
-                except:
-                    pass
-                self.process = None
+            await self._cleanup_process()
+    
+    async def _cleanup_process(self) -> None:
+        """Robustly clean up the subprocess."""
+        if not self.process:
+            return
+        
+        try:
+            # First try graceful termination
+            self.process.terminate()
+            try:
+                await asyncio.wait_for(self.process.wait(), timeout=5.0)
+            except asyncio.TimeoutError:
+                # Force kill if it doesn't terminate gracefully
+                self.process.kill()
+                await self.process.wait()
+        except ProcessLookupError:
+            # Process already dead
+            pass
+        except Exception as e:
+            logger.warning(f"Error cleaning up Claude Code process: {e}")
+        finally:
+            self.process = None
     
     async def _read_streaming_json(self) -> AsyncGenerator[ClaudeCodeResponse, None]:
         """Read and parse streaming JSON output from Claude Code CLI."""
         if not self.process or not self.process.stdout:
             return
         
+        buffer = ""
         try:
             while True:
-                line = await self.process.stdout.readline()
-                if not line:
-                    break
-                
-                line_str = line.decode('utf-8').strip()
-                if not line_str:
-                    continue
-                
                 try:
-                    # Parse JSON message from Claude Code
-                    message_data = json.loads(line_str)
-                    response = self._parse_cli_message(message_data)
-                    if response:
-                        yield response
+                    # Read with timeout to avoid hanging
+                    line = await asyncio.wait_for(
+                        self.process.stdout.readline(),
+                        timeout=30.0  # 30 second timeout per line
+                    )
+                    
+                    if not line:
+                        # End of stream
+                        break
+                    
+                    line_str = line.decode('utf-8').strip()
+                    if not line_str:
+                        continue
+                    
+                    # Add to buffer in case we get partial JSON
+                    buffer += line_str
+                    
+                    try:
+                        # Try to parse complete JSON
+                        message_data = json.loads(buffer)
+                        response = self._parse_cli_message(message_data)
+                        if response:
+                            yield response
+                        buffer = ""  # Clear buffer on successful parse
                         
-                except json.JSONDecodeError as e:
-                    logger.warning(f"Failed to parse JSON line: {line_str[:100]}... Error: {e}")
-                    continue
+                    except json.JSONDecodeError:
+                        # Might be partial JSON, try adding more lines
+                        if len(buffer) > 10000:  # Prevent buffer overflow
+                            logger.warning(f"JSON buffer too large, discarding: {buffer[:100]}...")
+                            buffer = ""
+                        continue
+                
+                except asyncio.TimeoutError:
+                    logger.warning("Timeout reading from Claude Code CLI stream")
+                    break
                     
         except Exception as e:
             logger.error(f"Error reading streaming JSON: {e}")
+        
+        # Check if there's stderr output with errors
+        if self.process and self.process.stderr:
+            try:
+                stderr_data = await asyncio.wait_for(
+                    self.process.stderr.read(1024),
+                    timeout=1.0
+                )
+                if stderr_data:
+                    stderr_str = stderr_data.decode('utf-8', errors='ignore')
+                    logger.error(f"Claude Code CLI stderr: {stderr_str}")
+            except:
+                pass
     
     def _parse_cli_message(self, message_data: Dict[str, Any]) -> Optional[ClaudeCodeResponse]:
         """Parse CLI JSON message according to Claude Code message schema."""
@@ -272,26 +332,22 @@ class ClaudeCodeSessionManager:
             
             yield response
     
-    def stop_session(self, session_id: str) -> None:
+    async def stop_session(self, session_id: str) -> None:
         """Stop a specific Claude Code session."""
         if session_id in self.active_sessions:
             session = self.active_sessions[session_id]
             session.is_active = False
             
-            # Terminate process if running
-            if session.process:
-                try:
-                    session.process.terminate()
-                except:
-                    pass
+            # Use robust cleanup
+            await session._cleanup_process()
             
             del self.active_sessions[session_id]
             logger.info(f"Stopped Claude Code session: {session_id}")
     
-    def stop_all_sessions(self) -> None:
+    async def stop_all_sessions(self) -> None:
         """Stop all active Claude Code sessions."""
         for session_id in list(self.active_sessions.keys()):
-            self.stop_session(session_id)
+            await self.stop_session(session_id)
         logger.info("Stopped all Claude Code sessions")
     
     def get_active_sessions(self) -> list[str]:
