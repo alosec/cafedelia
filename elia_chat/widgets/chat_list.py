@@ -19,6 +19,7 @@ from textual.widgets.option_list import Option
 from elia_chat.chats_manager import ChatsManager
 from elia_chat.config import LaunchConfig
 from elia_chat.models import ChatData
+from elia_chat.widgets.pagination_mixin import PaginationMixin, PaginatedDataSource
 
 
 @dataclass
@@ -56,7 +57,19 @@ class ChatListItem(Option):
         self.config = config
 
 
-class ChatList(OptionList):
+class ChatDataSource:
+    """Data source adapter for ChatsManager to work with pagination."""
+    
+    async def get_page(self, limit: int, offset: int) -> list[ChatData]:
+        """Get a page of chat data."""
+        return await ChatsManager.paginated_chats(limit=limit, offset=offset)
+    
+    async def get_total_count(self) -> int:
+        """Get total count of chats."""
+        return await ChatsManager.count_chats()
+
+
+class ChatList(OptionList, PaginationMixin[ChatData]):
     BINDINGS = [
         Binding(
             "escape",
@@ -82,6 +95,11 @@ class ChatList(OptionList):
         Binding("pageup", "page_up", "Page Up", show=False),
     ]
 
+    def __init__(self, **kwargs):
+        OptionList.__init__(self, **kwargs)
+        PaginationMixin.__init__(self, page_size=50, preload_pages=2)
+        self._data_source_configured = False
+
     @dataclass
     class ChatOpened(Message):
         chat: ChatData
@@ -93,7 +111,15 @@ class ChatList(OptionList):
         """Cursor attempting to move out-of-bounds at bottom of list."""
 
     async def on_mount(self) -> None:
-        await self.reload_and_refresh()
+        # Configure data source now that app is available
+        if not self._data_source_configured:
+            data_source = ChatDataSource()
+            item_factory = lambda chat: ChatListItem(chat, self.app.launch_config)
+            self.set_data_source(data_source, item_factory)
+            self._data_source_configured = True
+        
+        # Initialize pagination instead of loading all chats
+        await self.initialize_pagination()
 
     @on(OptionList.OptionSelected)
     async def post_chat_opened(self, event: OptionList.OptionSelected) -> None:
@@ -104,9 +130,11 @@ class ChatList(OptionList):
 
     @on(OptionList.OptionHighlighted)
     @on(events.Focus)
-    def show_border_subtitle(self) -> None:
+    async def show_border_subtitle(self) -> None:
         if self.highlighted is not None:
             self.border_subtitle = self.get_border_subtitle()
+            # Check if we need to load more data for infinite scroll
+            await self.handle_scroll_near_end(self.highlighted)
         elif self.option_count > 0:
             self.highlighted = 0
 
@@ -114,16 +142,23 @@ class ChatList(OptionList):
         self.border_subtitle = None
 
     async def reload_and_refresh(self, new_highlighted: int = -1) -> None:
-        """Reload the chats and refresh the widget. Can be used to
-        update the ordering/previews/titles etc contained in the list.
+        """Reload the chats and refresh the widget with pagination.
 
         Args:
             new_highlighted: The index to highlight after refresh.
         """
-        self.options = await self.load_chat_list_items()
         old_highlighted = self.highlighted
+        
+        # Clear existing data and reset pagination
         self.clear_options()
-        self.add_options(self.options)
+        self.loaded_pages.clear()
+        self.loading_pages.clear()
+        self.all_loaded = False
+        self.current_page = 0
+        
+        # Reinitialize pagination
+        await self.initialize_pagination()
+        
         self.border_title = self.get_border_title()
         if new_highlighted > -1:
             self.highlighted = new_highlighted
@@ -133,19 +168,20 @@ class ChatList(OptionList):
         self.refresh()
 
     async def load_chat_list_items(self) -> list[ChatListItem]:
-        chats = await self.load_chats()
-        return [ChatListItem(chat, self.app.launch_config) for chat in chats]
+        """Legacy method - now handled by pagination."""
+        log.warning("load_chat_list_items called - should use pagination instead")
+        return []
 
     async def load_chats(self) -> list[ChatData]:
-        all_chats = await ChatsManager.all_chats()
-        return all_chats
+        """Legacy method - now handled by pagination.""" 
+        log.warning("load_chats called - should use pagination instead")
+        return []
 
     async def action_archive_chat(self) -> None:
         if self.highlighted is None:
             return
 
         item = cast(ChatListItem, self.get_option_at_index(self.highlighted))
-        self.options.pop(self.highlighted)
         self.remove_option_at_index(self.highlighted)
 
         chat_id = item.chat.id
@@ -160,7 +196,14 @@ class ChatList(OptionList):
         self.refresh()
 
     def get_border_title(self) -> str:
-        return f"History ({len(self.options)})"
+        loaded_count = self.option_count
+        if self.total_items > 0:
+            if self.all_loaded:
+                return f"History ({loaded_count} of {self.total_items})"
+            else:
+                return f"History ({loaded_count} of {self.total_items}+)"
+        else:
+            return f"History ({loaded_count})"
 
     def get_border_subtitle(self) -> str:
         if self.highlighted is None:
@@ -171,14 +214,14 @@ class ChatList(OptionList):
         new_chat_list_item = ChatListItem(chat_data, self.app.launch_config)
         log.debug(f"Creating new chat {new_chat_list_item!r}")
 
-        option_list = self.query_one(OptionList)
-        self.options = [
-            new_chat_list_item,
-            *self.options,
-        ]
-        option_list.clear_options()
-        option_list.add_options(self.options)
-        option_list.highlighted = 0
+        # Store existing options before clearing
+        existing_options = [self.get_option_at_index(i) for i in range(self.option_count)]
+        
+        # Clear and rebuild with new chat at top
+        self.clear_options()
+        self.add_option(new_chat_list_item)
+        self.add_options(existing_options)
+        self.highlighted = 0
         self.refresh()
 
     def action_cursor_up(self) -> None:
