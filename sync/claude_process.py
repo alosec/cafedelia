@@ -28,6 +28,10 @@ class ClaudeCodeResponse:
     message_type: str  # 'user', 'assistant', 'system', 'result'
     is_complete: bool = False
     raw_message_data: Optional[Dict[str, Any]] = None  # Store raw data for rich formatting
+    is_sidechain: bool = False  # Whether this is a sidechain message
+    sidechain_metadata: Dict[str, Any] = None  # Sidechain execution metadata
+    message_source: str = "main"  # Source: 'main', 'task', 'tool', 'todo'
+    raw_json: str = ""  # Raw JSON string for atomic persistence
 
 
 class ClaudeCodeSession:
@@ -157,7 +161,7 @@ class ClaudeCodeSession:
                     try:
                         # Try to parse complete JSON
                         message_data = json.loads(buffer)
-                        response = self._parse_cli_message(message_data)
+                        response = self._parse_cli_message(message_data, buffer)
                         if response:
                             yield response
                         buffer = ""  # Clear buffer on successful parse
@@ -189,10 +193,65 @@ class ClaudeCodeSession:
             except:
                 pass
     
-    def _parse_cli_message(self, message_data: Dict[str, Any]) -> Optional[ClaudeCodeResponse]:
+    def _detect_sidechain_properties(self, message_data: Dict[str, Any]) -> tuple[bool, Dict[str, Any], str]:
+        """Detect sidechain properties from message data using heuristics."""
+        is_sidechain = False
+        sidechain_metadata = {}
+        message_source = "main"
+        
+        # For live streaming, we use heuristics since we don't get isSidechain flag
+        raw_message = message_data.get('message', {})
+        if isinstance(raw_message, dict) and 'content' in raw_message:
+            content = raw_message['content']
+            if isinstance(content, list):
+                for item in content:
+                    if isinstance(item, dict) and item.get('type') == 'tool_use':
+                        tool_name = item.get('name', '')
+                        # Task agent calls are typically sidechain operations
+                        if tool_name == 'Task':
+                            is_sidechain = True
+                            message_source = "task"
+                            sidechain_metadata = {
+                                'tool_name': tool_name,
+                                'tool_input': item.get('input', {}),
+                                'detected_via': 'task_heuristic'
+                            }
+                        elif tool_name == 'TodoWrite':
+                            is_sidechain = True
+                            message_source = "todo"
+                            sidechain_metadata = {
+                                'tool_name': tool_name,
+                                'tool_input': item.get('input', {}),
+                                'detected_via': 'todo_heuristic'
+                            }
+                        elif tool_name in ['Agent', 'SubAgent']:
+                            is_sidechain = True
+                            message_source = "tool"
+                            sidechain_metadata = {
+                                'tool_name': tool_name,
+                                'tool_input': item.get('input', {}),
+                                'detected_via': 'agent_heuristic'
+                            }
+                        break
+        
+        # Add common metadata
+        if is_sidechain:
+            sidechain_metadata.update({
+                'session_id': message_data.get('session_id'),
+                'cwd': message_data.get('cwd'),
+                'version': message_data.get('version'),
+                'timestamp': message_data.get('timestamp')
+            })
+        
+        return is_sidechain, sidechain_metadata, message_source
+    
+    def _parse_cli_message(self, message_data: Dict[str, Any], raw_json_str: str = "") -> Optional[ClaudeCodeResponse]:
         """Parse CLI JSON message according to Claude Code message schema."""
         try:
             message_type = message_data.get('type', '')
+            
+            # Detect sidechain properties for all message types
+            is_sidechain, sidechain_metadata, message_source = self._detect_sidechain_properties(message_data)
             
             if message_type == "system":
                 # System initialization message
@@ -217,7 +276,11 @@ class ClaudeCodeSession:
                             "api_key_source": message_data.get('apiKeySource', 'subscription'),
                             "permission_mode": message_data.get('permissionMode', 'default'),
                         },
-                        message_type="system"
+                        message_type="system",
+                        is_sidechain=is_sidechain,
+                        sidechain_metadata=sidechain_metadata,
+                        message_source=message_source,
+                        raw_json=raw_json_str
                     )
             
             elif message_type == "user":
@@ -234,7 +297,11 @@ class ClaudeCodeSession:
                     session_id=message_data.get('session_id', self.session_id),
                     metadata={},
                     message_type="user",
-                    raw_message_data={'type': 'user', **raw_message}
+                    raw_message_data={'type': 'user', **raw_message},
+                    is_sidechain=is_sidechain,
+                    sidechain_metadata=sidechain_metadata,
+                    message_source=message_source,
+                    raw_json=raw_json_str
                 )
             
             elif message_type == "assistant":
@@ -252,7 +319,11 @@ class ClaudeCodeSession:
                         "usage": raw_message.get('usage', {}),
                     },
                     message_type="assistant",
-                    raw_message_data=corrected_message
+                    raw_message_data=corrected_message,
+                    is_sidechain=is_sidechain,
+                    sidechain_metadata=sidechain_metadata,
+                    message_source=message_source,
+                    raw_json=raw_json_str
                 )
             
             elif message_type == "result":
@@ -276,7 +347,11 @@ class ClaudeCodeSession:
                         "is_error": message_data.get('is_error', False),
                     },
                     message_type="result",
-                    is_complete=True
+                    is_complete=True,
+                    is_sidechain=is_sidechain,
+                    sidechain_metadata=sidechain_metadata,
+                    message_source=message_source,
+                    raw_json=raw_json_str
                 )
             
             return None

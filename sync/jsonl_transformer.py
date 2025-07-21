@@ -166,6 +166,35 @@ class JSONLTransformer:
                 # Default to user for unknown types
                 role = 'user'
             
+            # Detect sidechain messages and metadata
+            is_sidechain = jsonl_data.get('isSidechain', False)
+            sidechain_metadata = {}
+            message_source = "main"
+            
+            if is_sidechain:
+                sidechain_metadata = {
+                    'userType': jsonl_data.get('userType'),
+                    'parentUuid': jsonl_data.get('parentUuid'),
+                    'cwd': jsonl_data.get('cwd'),
+                    'gitBranch': jsonl_data.get('gitBranch')
+                }
+                
+                # Determine message source based on content
+                message_content = jsonl_data.get('message', {})
+                if isinstance(message_content, dict):
+                    content_data = message_content.get('content', [])
+                    if isinstance(content_data, list):
+                        for item in content_data:
+                            if isinstance(item, dict) and item.get('type') == 'tool_use':
+                                tool_name = item.get('name', '')
+                                if tool_name == 'Task':
+                                    message_source = "task"
+                                elif tool_name == 'TodoWrite':
+                                    message_source = "todo"
+                                else:
+                                    message_source = "tool"
+                                break
+            
             # Extract content from various JSONL formats
             content = self._extract_content(jsonl_data)
             
@@ -223,7 +252,10 @@ class JSONLTransformer:
                 content=content or '',
                 timestamp=timestamp,
                 meta=metadata,
-                model=self.claude_code_model.id
+                model=self.claude_code_model.id,
+                is_sidechain=is_sidechain,
+                sidechain_metadata=sidechain_metadata,
+                message_source=message_source
             )
             
         except Exception as e:
