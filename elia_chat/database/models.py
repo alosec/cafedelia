@@ -46,6 +46,18 @@ class MessageDao(AsyncAttrs, SQLModel, table=True):
     """
     model: str | None
     """The model that wrote this response. (Could switch models mid-chat, possibly)"""
+    is_sidechain: bool = Field(default=False, index=True)
+    """Whether this message is from a sidechain (Task agent, background processing)"""
+    sidechain_metadata: dict[str, Any] = Field(sa_column=Column(JSON), default={})
+    """Metadata about sidechain execution (userType, parentUuid, etc.)"""
+    message_source: str = Field(default="main")
+    """Source of the message: 'main', 'task', 'tool', 'todo'"""
+    raw_json: str | None = Field(default=None)
+    """Raw JSON from Claude Code for complete message fidelity"""
+    message_type: str = Field(default="assistant")
+    """Message type: 'user', 'assistant', 'system', 'result'"""
+    message_metadata: dict[str, Any] = Field(sa_column=Column(JSON), default={})
+    """Additional message metadata (tools, usage, etc.)"""
 
 
 class ChatDao(AsyncAttrs, SQLModel, table=True):

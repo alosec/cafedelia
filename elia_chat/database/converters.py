@@ -13,8 +13,14 @@ def chat_message_to_message_dao(
     chat_id: int,
 ) -> MessageDao:
     """Convert a ChatMessage to a SQLModel message."""
-    meta: dict[str, Any] = {}
+    meta: dict[str, Any] = message.message.get("meta", {})
     content = message.message.get("content", "")
+    
+    # Extract sidechain information from meta if present
+    is_sidechain = meta.get("is_sidechain", False)
+    sidechain_metadata = meta.get("sidechain_metadata", {})
+    message_source = meta.get("message_source", "main")
+    
     return MessageDao(
         chat_id=chat_id,
         role=message.message["role"],
@@ -22,6 +28,9 @@ def chat_message_to_message_dao(
         timestamp=message.timestamp,
         model=message.model.lookup_key,
         meta=meta,
+        is_sidechain=is_sidechain,
+        sidechain_metadata=sidechain_metadata,
+        message_source=message_source,
     )
 
 
@@ -46,6 +55,19 @@ def message_dao_to_chat_message(message_dao: MessageDao, model: str) -> ChatMess
         "content": message_dao.content,
         "role": message_dao.role,  # type: ignore
     }
+    
+    # Include sidechain metadata in the meta field for display widgets
+    meta = dict(message_dao.meta) if message_dao.meta else {}
+    if hasattr(message_dao, 'is_sidechain'):
+        meta.update({
+            "is_sidechain": message_dao.is_sidechain,
+            "sidechain_metadata": message_dao.sidechain_metadata or {},
+            "message_source": message_dao.message_source or "main"
+        })
+    
+    # Add meta to message if we have sidechain data
+    if meta:
+        message["meta"] = meta  # type: ignore
 
     return ChatMessage(
         message=message,
