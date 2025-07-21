@@ -1,0 +1,1 @@
+"""Commands for Cafedelia management and maintenance."""

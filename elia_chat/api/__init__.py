@@ -1,0 +1,1 @@
+"""API layer for on-demand content retrieval from JSONL files."""
