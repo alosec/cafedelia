@@ -93,12 +93,12 @@ class SyncService:
                     logger.info(f"Synced new session {session.session_id} to chat {chat_id}")
         elif update.update_type == 'updated':
             logger.debug(f"Session updated: {session.session_id}")
-            # Sync updated session
-            messages = watcher.get_session_messages(session.session_id)
-            if messages:
-                chat_id = await transformer.sync_session_to_database(session, messages)
-                if chat_id:
-                    logger.debug(f"Updated session {session.session_id} in chat {chat_id}")
+            # Use incremental sync for updates
+            jsonl_path = watcher.get_session_file_path(session.session_id)
+            if jsonl_path:
+                new_count = await transformer.sync_session_incrementally(session, jsonl_path)
+                if new_count > 0:
+                    logger.debug(f"Incrementally synced {new_count} new messages for session {session.session_id}")
     
     async def manual_sync(self) -> int:
         """Manually trigger a full sync and return count of synced sessions."""

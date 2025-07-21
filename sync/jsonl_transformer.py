@@ -17,6 +17,7 @@ from elia_chat.models import ChatMessage, get_model
 from sync.jsonl_watcher import ClaudeSession
 from sync.content_extractor import ContentExtractor
 from sync.deduplication_service import deduplication_service
+from sync.incremental_sync import incremental_sync_engine
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,21 @@ class JSONLTransformer:
                 provider="Claude Code",
                 provider_type="cli"
             )
+    
+    async def sync_session_incrementally(self, session: ClaudeSession, jsonl_path: Path) -> int:
+        """Use incremental sync engine for efficient updates."""
+        try:
+            new_message_count = await incremental_sync_engine.sync_new_messages(
+                session.session_id, 
+                jsonl_path
+            )
+            return new_message_count
+        except Exception as e:
+            logger.error(f"Incremental sync failed for {session.session_id}: {e}")
+            # Fall back to full sync if incremental fails
+            logger.info(f"Falling back to full sync for {session.session_id}")
+            incremental_sync_engine.reset_position(session.session_id)
+            return await incremental_sync_engine.sync_new_messages(session.session_id, jsonl_path)
     
     async def sync_session_to_database(self, session: ClaudeSession, messages: List[dict]) -> Optional[int]:
         """Sync a Claude Code session to Elia database with proper deduplication."""

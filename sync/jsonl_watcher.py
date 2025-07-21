@@ -204,6 +204,19 @@ class JSONLWatcher:
             return []
         return []
     
+    def get_session_file_path(self, session_id: str) -> Optional[Path]:
+        """Get the JSONL file path for a session ID."""
+        # Search across all project directories
+        for project_dir in self.projects_dir.iterdir():
+            if not project_dir.is_dir():
+                continue
+            
+            jsonl_path = project_dir / f"{session_id}.jsonl"
+            if jsonl_path.exists():
+                return jsonl_path
+        
+        return None
+    
     def get_session_messages(self, session_id: str) -> List[dict]:
         """Get all messages for a specific session."""
         session = self.session_cache.get(session_id)

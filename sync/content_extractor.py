@@ -11,6 +11,16 @@ from typing import List, Dict, Any
 class ContentExtractor:
     """Unified content extraction for Claude Code messages."""
     
+    # Aggressive content limits for database storage
+    MAX_TOOL_RESULT_LENGTH = 500  # Reduced from 1000
+    MAX_TEXT_LENGTH = 2000  # Limit for assistant reasoning text
+    MAX_PARAM_LENGTH = 50  # Reduced from 100
+    MAX_PARAMS_SHOWN = 2  # Reduced from 3
+    
+    # Tools that produce massive outputs
+    VERBOSE_TOOLS = {'LS', 'Grep', 'Glob', 'find', 'tree', 'cat', 'head', 'tail'}
+    VERBOSE_TOOL_MAX_LENGTH = 200  # Even more aggressive for known verbose tools
+    
     @staticmethod
     def extract_assistant_content(message_data: Dict[str, Any]) -> List[str]:
         """Extract content from assistant message, including reasoning and tool calls."""
@@ -36,6 +46,9 @@ class ContentExtractor:
                     if item_type == 'text':
                         text = item.get('text', '').strip()
                         if text:
+                            # Limit text length for database storage
+                            if len(text) > ContentExtractor.MAX_TEXT_LENGTH:
+                                text = text[:ContentExtractor.MAX_TEXT_LENGTH] + "..."
                             text_parts.append(text)
                     elif item_type == 'tool_use':
                         tool_name = item.get('name', 'unknown')
@@ -47,12 +60,14 @@ class ContentExtractor:
                         if tool_input:
                             # Show key parameters (truncated for readability)
                             key_params = []
-                            for key, value in tool_input.items():
-                                if isinstance(value, str) and len(value) > 100:
-                                    value = value[:100] + "..."
+                            for key, value in list(tool_input.items())[:ContentExtractor.MAX_PARAMS_SHOWN]:
+                                if isinstance(value, str) and len(value) > ContentExtractor.MAX_PARAM_LENGTH:
+                                    value = value[:ContentExtractor.MAX_PARAM_LENGTH] + "..."
+                                elif isinstance(value, (list, dict)):
+                                    value = f"[{type(value).__name__}]"  # Just show type for complex objects
                                 key_params.append(f"{key}: {value}")
                             if key_params:
-                                tool_desc += f"\n  Parameters: {', '.join(key_params[:3])}"
+                                tool_desc += f"\n  Parameters: {', '.join(key_params)}"
                         tool_parts.append(tool_desc)
             
             # Combine text and tool parts
@@ -75,11 +90,23 @@ class ContentExtractor:
         if 'toolUseResult' in message_data:
             tool_result = message_data['toolUseResult']
             result_text = tool_result.get('result', '')
+            tool_name = tool_result.get('toolName', '')
             
             if result_text:
-                # Truncate very long results but show more than before
-                if len(result_text) > 1000:
-                    result_text = result_text[:1000] + "\n\n[... truncated ...]"
+                # Check if this is a verbose tool
+                max_length = ContentExtractor.MAX_TOOL_RESULT_LENGTH
+                if tool_name in ContentExtractor.VERBOSE_TOOLS:
+                    max_length = ContentExtractor.VERBOSE_TOOL_MAX_LENGTH
+                
+                # Aggressively truncate results for database storage
+                if len(result_text) > max_length:
+                    # For verbose tools, show just a summary
+                    if tool_name in ContentExtractor.VERBOSE_TOOLS:
+                        lines = result_text.split('\n')
+                        summary = f"[{tool_name} output: {len(lines)} lines, {len(result_text)} chars]"
+                        result_text = summary + f"\n{lines[0] if lines else ''}...\n[truncated]"
+                    else:
+                        result_text = result_text[:max_length] + "\n[... truncated ...]"
                 
                 result_part = f"📋 **Tool Result:**\n```\n{result_text}\n```"
                 
@@ -104,8 +131,8 @@ class ContentExtractor:
                 if isinstance(item, dict) and item.get('type') == 'tool_result':
                     result_content = item.get('content', '')
                     if result_content:
-                        if len(result_content) > 1000:
-                            result_content = result_content[:1000] + "\n\n[... truncated ...]"
+                        if len(result_content) > ContentExtractor.MAX_TOOL_RESULT_LENGTH:
+                            result_content = result_content[:ContentExtractor.MAX_TOOL_RESULT_LENGTH] + "\n[... truncated ...]"
                         content_parts.append(f"📋 **Tool Result:**\n```\n{result_content}\n```")
         
         return content_parts
