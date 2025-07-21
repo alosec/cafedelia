@@ -69,10 +69,14 @@ class OptionsModal(ModalScreen[RuntimeConfig]):
                 selected_model = self.runtime_config.selected_model
                 models_rs.border_title = "Available Models"
                 for model in self.elia.launch_config.all_models:
+                    # Only show Claude Code models for now
+                    if model.provider != "Claude Code":
+                        continue
+                    
                     label = f"{escape(model.display_name or model.name)}"
-                    provider = model.provider
-                    if provider:
-                        label += f" [i]by[/] {provider}"
+                    # Simplified provider display for Claude models
+                    if model.description:
+                        label += f"\n[dim i]{escape(model.description)}[/]"
 
                     ids_defined = selected_model.id and model.id
                     same_id = ids_defined and selected_model.id == model.id

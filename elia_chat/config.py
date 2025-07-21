@@ -39,6 +39,8 @@ class EliaChatModel(BaseModel):
     Setting a very high temperature will likely produce junk output."""
     max_retries: int = Field(default=0)
     """The number of times to retry a request after it fails before giving up."""
+    cli_model: str | None = None
+    """For CLI providers, the model identifier to pass to the CLI command."""
 
     @property
     def lookup_key(self) -> str:
@@ -144,22 +146,43 @@ def get_builtin_claude_code_models() -> list[EliaChatModel]:
     """Get built-in Claude Code models for CLI provider integration."""
     return [
         EliaChatModel(
-            id="claude-code",
+            id="claude-code-default",
             name="claude-code",
-            display_name="Claude Code Session",
+            display_name="Claude Code (Default)",
             provider="Claude Code",
             product="Claude Code",
-            description="Live Claude Code session integration with project context",
+            description="Claude Code with the default model selection",
+            cli_model="default",
+        ),
+        EliaChatModel(
+            id="claude-code-sonnet",
+            name="claude-code",
+            display_name="Claude Code (Sonnet 4)",
+            provider="Claude Code",
+            product="Claude Code",
+            description="Claude Code with Sonnet 4 (claude-sonnet-4-20250514)",
+            cli_model="sonnet",
+        ),
+        EliaChatModel(
+            id="claude-code-opus",
+            name="claude-code",
+            display_name="Claude Code (Opus 4)",
+            provider="Claude Code",
+            product="Claude Code",
+            description="Claude Code with Opus 4 (claude-opus-4-20250514)",
+            cli_model="opus",
         ),
     ]
 
 
 def get_builtin_models() -> list[EliaChatModel]:
     return (
-        get_builtin_openai_models()
-        + get_builtin_anthropic_models()
-        + get_builtin_google_models()
-        + get_builtin_claude_code_models()
+        # Temporarily disabled - focusing on Claude Code
+        # get_builtin_openai_models()
+        # + get_builtin_anthropic_models()
+        # + get_builtin_google_models()
+        # +
+        get_builtin_claude_code_models()
     )
 
 
@@ -171,7 +194,7 @@ class LaunchConfig(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    default_model: str = Field(default="cafedelia-gpt-4o")
+    default_model: str = Field(default="claude-code-default")
     """The ID or name of the default model."""
     system_prompt: str = Field(
         default=os.getenv(

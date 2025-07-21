@@ -400,9 +400,14 @@ class Chat(Widget):
             
             # Get or create session with current project path
             project_path = str(Path.cwd())  # Use current directory as project path
+            model_choice = None
+            if hasattr(self.model, 'cli_model'):
+                model_choice = self.model.cli_model
+            
             actual_session_id = await session_manager.get_or_create_session(
                 session_id if should_resume else None, 
-                project_path
+                project_path,
+                model=model_choice
             )
             
             # Emit session ID for log viewer
@@ -430,10 +435,17 @@ class Chat(Widget):
             response_content = ""
             message_count = 0
             
+            # Extract model selection from chat model
+            model_choice = None
+            if hasattr(self.model, 'cli_model'):
+                model_choice = self.model.cli_model
+                log.debug(f"Using Claude Code model: {model_choice}")
+            
             async for claude_response in session_manager.send_message(
                 actual_session_id, 
                 user_message, 
-                resume=should_resume
+                resume=should_resume,
+                model=model_choice
             ):
                 message_count += 1
                 
