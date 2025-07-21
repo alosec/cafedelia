@@ -97,12 +97,32 @@ async def parse_jsonl_metadata(self, file_path: Path) -> SessionMetadata:
 - Automatic session ID capture and JSONL file tailing
 - Professional debugging experience with syntax highlighting
 
-## Current Issue: Live Chat Streaming Disconnect
-**Status**: Chat UI stops updating while logs continue showing responses
-**Critical Finding**: Claude Code subprocess working, issue in UI update pipeline
-**Evidence**: Log viewer shows active JSON while chat interface freezes
+## Current Critical Issue: SessionLogViewer Complete Failure 🚨
+**Status**: Log viewer widget fundamentally broken despite extensive architectural fixes
+**Test Case**: Session `3c6aadac-fb63-415b-8593-68e90e89a985` - file exists (350KB) but viewer shows nothing
+**Critical Impact**: Core "glorified log watcher" functionality completely non-operational
+
+### Session ID Display Fixes Completed ✅
+- **History Widget**: Session IDs now display properly (full UUID, no truncation)
+- **Chat Header**: Session IDs show in header (format: "Model Name • session-id")
+- **Database Integration**: ChatData model includes session_id, converters updated
+- **Sync Service**: JSONL sync working, sessions properly loaded into database
+
+### Log Viewer Debug History
+- **Fixed Session Detection**: Updated to use ChatData.session_id directly
+- **Fixed File Discovery**: Enhanced with project directory fallback search  
+- **Fixed Reactive Updates**: Session ID properly passed to log viewer on mount
+- **Added Debug Logging**: Comprehensive logging in _start_tailing() method
+- **Remaining Issue**: Despite all fixes, tailing mechanism produces no output
+
+### Investigation Priorities
+1. **Widget Lifecycle**: Verify SessionLogViewer mounting and TextArea query success
+2. **Async Task Debugging**: Add extensive error handling to _tail_file() method
+3. **File Reading Verification**: Test actual file content reading in isolation
+4. **UI Update Pipeline**: Verify TextArea.text updates trigger visual refresh
 
 ## Next Phase Focus
-- Debug and fix live chat tool result display issue
-- Achieve complete UX parity between live and historical chat
-- UI/UX optimization and performance improvements
+- **URGENT**: Fix SessionLogViewer - core value proposition depends on this
+- Test widget mounting and async task execution in isolation
+- Add comprehensive error handling and diagnostic output
+- Verify Textual widget lifecycle and UI update mechanisms

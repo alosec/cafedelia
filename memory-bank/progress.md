@@ -1,9 +1,9 @@
 # Progress
 
-## Current Status: Live Chat Tool Use Display Parity
+## Current Status: Session Log Viewer Critical Bug Fix
 **Date**: July 21, 2025  
-**Phase**: Achieving UX consistency between live and historical chat tool display  
-**Next Phase**: Advanced Session Management Features
+**Phase**: Debugging non-functional log viewer despite architectural fixes
+**Next Phase**: Core "Log Watcher" Functionality Must Work
 
 ## Completed Milestones ✅
 
@@ -199,11 +199,24 @@ EliaChatModel(
   - Professional CSS styling for debugging interface
 - **Result**: Side-by-side view of formatted chat + raw JSON responses for comprehensive debugging
 
-#### 🆕 CURRENT ISSUE: Live Chat Streaming Disconnect (July 21, 2025)
-- **Critical Discovery**: Chat UI stops updating while logs continue showing Claude responses
-- **Evidence**: Log viewer shows active JSON streaming while chat interface freezes
-- **Analysis**: Claude Code subprocess working correctly, issue in UI update pipeline
-- **Implications**: Problem isolated to streaming message processing or Textual UI refresh mechanism
+#### 🚨 CRITICAL ISSUE: Session Log Viewer Completely Non-Functional (July 21, 2025)
+- **Core Problem**: Log viewer widget fails to tail JSONL files despite all architectural fixes
+- **Test Case**: Session `3c6aadac-fb63-415b-8593-68e90e89a985` - file exists (350KB) but viewer shows nothing
+- **Architecture Status**: All session ID detection, file discovery, and reactive updates implemented correctly
+- **Critical Gap**: The "glorified log watcher" core feature is completely broken despite extensive fixes
+
+##### Recent Session Display Fixes Completed ✅
+- **July 21 Evening**: Fixed session ID display in History widget (removed truncation)
+- **July 21 Evening**: Fixed session ID display in ChatHeader widget (model • session_id format) 
+- **July 21 Evening**: Updated ChatData model and database converters for session_id support
+- **July 21 Evening**: Fixed log viewer session detection to use ChatData.session_id directly
+- **July 21 Evening**: Enhanced file discovery with project directory fallback search
+- **July 21 Evening**: Added comprehensive debug logging to SessionLogViewer
+
+##### Remaining Critical Problem
+- **Issue**: Despite all fixes, log viewer shows no content, no error messages, no diagnostic info
+- **Status**: SessionLogViewer widget appears to mount but tailing mechanism completely silent
+- **Impact**: Core value proposition ("glorified log watcher") is non-functional
 
 ## Known Challenges and Solutions
 
@@ -226,6 +239,8 @@ EliaChatModel(
 - [x] **Claude Code Integration**: Successful session discovery and attachment  
 - [x] **CLI Session Support**: Direct Claude Code integration without tmux embedding
 - [x] **JSONL Sync System**: Historical session data successfully imported
+- [x] **Session ID Display**: Session IDs visible in History widget and ChatHeader
+- [🚨] **Session Log Viewer**: CRITICAL - Core log tailing functionality broken despite fixes
 - [ ] **Message Parsing**: Complete tool call and result parsing
 - [ ] **Performance Optimization**: Lazy loading and pagination for large datasets
 - [ ] **UI Responsiveness**: Optimized chatbox and history browsing experience

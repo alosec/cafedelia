@@ -229,6 +229,28 @@ class ContentExtractor:
         # Same logic as historical transformer for consistency
 ```
 
+#### Session Log Viewer Pattern (CRITICAL ISSUE) 🚨
+```python
+class SessionLogViewer(Widget):
+    """Real-time JSONL log viewer - CURRENTLY BROKEN."""
+    
+    session_id: reactive[Optional[str]] = reactive(None)
+    
+    def watch_session_id(self, session_id: Optional[str]) -> None:
+        """ISSUE: This reactive trigger works but tailing fails."""
+        if session_id:
+            self._start_tailing(session_id)  # Called but no output
+    
+    def _start_tailing(self, session_id: str) -> None:
+        """ISSUE: File discovery works, but async tailing silent."""
+        # File exists: ~/.claude/projects/-home-alex-code-cafedelia/3c6aadac-fb63-415b-8593-68e90e89a985.jsonl
+        # But _tail_file() produces no visible output despite file content
+        
+    async def _tail_file(self) -> None:
+        """ISSUE: This async task runs but TextArea never updates."""
+        # Problem: Either file reading, content processing, or UI update failing
+```
+
 #### Session Intelligence Pattern
 ```python
 class SessionMonitor:

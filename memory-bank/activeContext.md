@@ -2,8 +2,8 @@
 
 ## Current State  
 - **Date**: July 21, 2025
-- **Focus**: Live Chat Message Grouping & Tool Use Display Parity
-- **Status**: Database deduplication fixed, streaming message grouper implemented, tool results still not displaying in live chat
+- **Focus**: Session Log Viewer Critical Bug Investigation
+- **Status**: Log viewer not tailing JSONL files despite session ID detection and file existence - urgent debugging needed
 
 ## Cafedelia Fork Strategy (July 20, 2025)
 
@@ -123,11 +123,24 @@
   - Session ID capture and auto-connection
 - **Result**: Professional debugging interface showing raw JSON responses + formatted chat side-by-side
 
-#### 🆕 CURRENT ISSUE: Streaming Disconnect in Live Chat  
-- **Symptom**: Chat UI stops updating but logs continue showing Claude responses
-- **Evidence**: Log viewer shows active JSON entries while chat interface freezes
-- **Analysis**: Claude Code subprocess working correctly, disconnect in UI update pipeline
-- **Critical Finding**: This suggests issue in streaming message processing or UI refresh, not Claude integration
+#### 🚨 CRITICAL ISSUE: Session Log Viewer Not Operational (July 21, 2025)
+- **Problem**: Log viewer widget not tailing JSONL files despite proper session ID detection
+- **Test Case**: Session `3c6aadac-fb63-415b-8593-68e90e89a985` exists in database and filesystem but log viewer shows no content
+- **File Status**: JSONL file exists at `~/.claude/projects/-home-alex-code-cafedelia/3c6aadac-fb63-415b-8593-68e90e89a985.jsonl` (350KB)
+- **Critical Gap**: Log viewer supposed to be the core "glorified log watcher" but fundamentally broken
+
+#### Recent Session ID Display Fixes ✅
+- **COMPLETED**: Added session IDs to History widget (full UUID, no truncation)
+- **COMPLETED**: Added session IDs to ChatHeader widget (model name • session_id format)
+- **COMPLETED**: Fixed ChatData model to include session_id field
+- **COMPLETED**: Updated converters to pass session_id from database
+
+#### Log Viewer Architecture Issues Under Investigation
+- **Fixed Session Detection**: Updated `_should_show_logs_by_default()` to use `chat_data.session_id` directly
+- **Fixed Session Assignment**: Log viewer gets session_id immediately in `compose()` method
+- **Enhanced File Discovery**: Added fallback search across all project directories
+- **Added Debug Logging**: Enhanced `_start_tailing()` with detailed path and discovery info
+- **Remaining Issue**: Despite all fixes, log viewer still not displaying content or diagnostic info
 
 ```python
 # Current Elia: Single model selection
