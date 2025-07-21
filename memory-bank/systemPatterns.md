@@ -229,27 +229,49 @@ class ContentExtractor:
         # Same logic as historical transformer for consistency
 ```
 
-#### Session Log Viewer Pattern (CRITICAL ISSUE) 🚨
+#### JSONL-First Chat Interface Pattern (REVOLUTIONARY) 🚀
 ```python
-class SessionLogViewer(Widget):
-    """Real-time JSONL log viewer - CURRENTLY BROKEN."""
+class JSONLChatInterface(Widget):
+    """Revolutionary JSONL-first chat interface eliminating database sync."""
     
     session_id: reactive[Optional[str]] = reactive(None)
     
-    def watch_session_id(self, session_id: Optional[str]) -> None:
-        """ISSUE: This reactive trigger works but tailing fails."""
-        if session_id:
-            self._start_tailing(session_id)  # Called but no output
-    
-    def _start_tailing(self, session_id: str) -> None:
-        """ISSUE: File discovery works, but async tailing silent."""
-        # File exists: ~/.claude/projects/-home-alex-code-cafedelia/3c6aadac-fb63-415b-8593-68e90e89a985.jsonl
-        # But _tail_file() produces no visible output despite file content
+    async def load_session_from_jsonl(self, session_id: str) -> None:
+        """Load and render entire chat from JSONL file directly."""
+        jsonl_path = self.discover_session_file(session_id)
         
-    async def _tail_file(self) -> None:
-        """ISSUE: This async task runs but TextArea never updates."""
-        # Problem: Either file reading, content processing, or UI update failing
+        # Parse JSONL into conversation format
+        conversation = await self.parse_jsonl_to_conversation(jsonl_path)
+        
+        # Render with same quality as database-driven interface
+        await self.render_conversation(conversation)
+        
+        # Start tailing for real-time updates
+        await self.start_tailing(jsonl_path)
+    
+    async def parse_jsonl_to_conversation(self, jsonl_path: Path) -> ConversationFlow:
+        """Extract rich conversation content directly from JSONL."""
+        # Use existing ContentExtractor logic
+        # Group messages into conversation blocks
+        # Apply rich formatting for tool calls and results
+        # Return structured conversation for rendering
+
+class InteractiveOverlay(Widget):
+    """Interactive Claude Code CLI overlay on top of JSONL interface."""
+    
+    async def send_message(self, message: str) -> None:
+        """Send message to live Claude Code CLI."""
+        # Existing streaming integration
+        # Updates automatically appear in JSONL file
+        # UI reflects changes through tailing mechanism
 ```
+
+#### JSONL-First Architecture Benefits ✅
+- **Single Source of Truth**: JSONL files contain authoritative session data
+- **Zero Sync Failures**: No database intermediary to fail or duplicate data
+- **Perfect Fidelity**: Chat interface shows exactly what Claude Code generates
+- **Real-time Updates**: File tailing provides immediate reflection of changes
+- **Detailed Information**: Access to full Claude Code metadata without data loss
 
 #### Session Intelligence Pattern
 ```python

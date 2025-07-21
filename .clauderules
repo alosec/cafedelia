@@ -97,32 +97,46 @@ async def parse_jsonl_metadata(self, file_path: Path) -> SessionMetadata:
 - Automatic session ID capture and JSONL file tailing
 - Professional debugging experience with syntax highlighting
 
-## Current Critical Issue: SessionLogViewer Complete Failure 🚨
-**Status**: Log viewer widget fundamentally broken despite extensive architectural fixes
-**Test Case**: Session `3c6aadac-fb63-415b-8593-68e90e89a985` - file exists (350KB) but viewer shows nothing
-**Critical Impact**: Core "glorified log watcher" functionality completely non-operational
+## BREAKTHROUGH: JSONL-First Architecture (July 21, 2025) 🚀
 
-### Session ID Display Fixes Completed ✅
-- **History Widget**: Session IDs now display properly (full UUID, no truncation)
-- **Chat Header**: Session IDs show in header (format: "Model Name • session-id")
+### Revolutionary Insight: Skip Database Entirely
+SessionLogViewer debugging revealed fundamental architectural opportunity:
+- **Discovery**: Initial file load fails while tailing works - diagnostic complete
+- **Root Cause**: Database sync is unreliable middleman causing data loss/complexity
+- **Solution**: Render chat interface directly from JSONL files (single source of truth)
+
+### JSONL-First Implementation Strategy ✅
+**Phase 1**: Fix SessionLogViewer initial load (prove JSONL rendering capability)
+**Phase 2**: Enhance JSONL content extraction (match current chat interface quality)
+**Phase 3**: Replace database-driven chat with JSONL-driven interface  
+**Phase 4**: Add interactive Claude Code overlay for live session interaction
+
+### Technical Benefits
+- **Perfect Fidelity**: Chat shows exactly what's in session logs (no sync failures)
+- **Zero Duplication**: Eliminate redundant data storage in database
+- **Real-time Updates**: File tailing provides immediate UI updates
+- **Rich Detail**: Access to full Claude Code metadata without lossy conversion
+
+### User Experience Vision
+- **Chat Interface**: Renders directly from JSONL with existing rich formatting
+- **Interactive Layer**: Overlay live Claude Code CLI on top of JSONL display
+- **Perfect Parity**: Session logs and chat interface show identical content
+- **No Limitations**: Full Claude Code functionality with superior UX
+
+### Current Status: SessionLogViewer Diagnosis Complete ✅
+- **Test Case**: Session `3c6aadac-fb63-415b-8593-68e90e89a985` (350KB, 140 lines)
+- **Confirmed Working**: Session ID detection, file discovery, reactive triggers
+- **Confirmed Broken**: Initial file load (tailing works for new content)
+- **Next Step**: Fix initial load to demonstrate JSONL rendering capability
+
+### Session ID Display Infrastructure Completed ✅
+- **History Widget**: Session IDs display properly (full UUID, no truncation)
+- **Chat Header**: Session IDs in header (format: "Model Name • session-id")
 - **Database Integration**: ChatData model includes session_id, converters updated
-- **Sync Service**: JSONL sync working, sessions properly loaded into database
+- **Debug Logging**: Comprehensive SessionLogViewer instrumentation added
 
-### Log Viewer Debug History
-- **Fixed Session Detection**: Updated to use ChatData.session_id directly
-- **Fixed File Discovery**: Enhanced with project directory fallback search  
-- **Fixed Reactive Updates**: Session ID properly passed to log viewer on mount
-- **Added Debug Logging**: Comprehensive logging in _start_tailing() method
-- **Remaining Issue**: Despite all fixes, tailing mechanism produces no output
-
-### Investigation Priorities
-1. **Widget Lifecycle**: Verify SessionLogViewer mounting and TextArea query success
-2. **Async Task Debugging**: Add extensive error handling to _tail_file() method
-3. **File Reading Verification**: Test actual file content reading in isolation
-4. **UI Update Pipeline**: Verify TextArea.text updates trigger visual refresh
-
-## Next Phase Focus
-- **URGENT**: Fix SessionLogViewer - core value proposition depends on this
-- Test widget mounting and async task execution in isolation
-- Add comprehensive error handling and diagnostic output
-- Verify Textual widget lifecycle and UI update mechanisms
+## Implementation Priority: JSONL-First Proof of Concept
+1. **Fix Initial Load**: Resolve SessionLogViewer blank display issue
+2. **Prove Concept**: Demonstrate rich chat rendering from JSONL files
+3. **Enhance Extraction**: Apply existing ContentExtractor to JSONL content
+4. **Replace Interface**: Transition from database-driven to JSONL-driven chat

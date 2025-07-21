@@ -49,8 +49,18 @@
   - Required for CLI provider functionality
   - Session creation, attachment, persistence
 - **Claude Code**: Primary CLI provider integration
-  - Session discovery from ~/.config/claude-code/sessions/
+  - Session discovery from ~/.claude/projects/[project]/[session-id].jsonl
   - --resume functionality for session attachment
+  - Model selection via --model flag:
+    - `default`: Uses Claude's default model selection
+    - `opus`: Claude Opus 4 (claude-opus-4-20250514)
+    - `sonnet`: Claude Sonnet 4 (claude-sonnet-4-20250514)
+  - Automatic fallback via --fallback-model flag
+  - Stream JSON output format: `--output-format stream-json`
+  - Future capability: `--input-format stream-json` for realtime streaming input
+    - Enables bidirectional streaming communication
+    - Could support progressive input for long prompts
+    - May allow for more responsive interaction patterns
 - **Git**: Repository and worktree management
   - Session context from git branch information
   - Future: automated worktree coordination
@@ -99,6 +109,7 @@ class EliaChatModel(BaseModel):
     cli_command: str | None = None       # e.g. "claude code"
     session_manager: str | None = None    # e.g. "tmux"
     session_discovery: bool = False       # Auto-detect existing sessions
+    cli_model: str | None = None          # Model identifier for CLI command
 ```
 
 #### TOML Configuration Extensions
