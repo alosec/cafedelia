@@ -1,0 +1,30 @@
+# Cafedelia Project Rules
+
+## Project Scope
+- **Focus**: Claude Code GUI wrapper specifically, not general CLI provider framework
+- **Goal**: Provide the visual interface and session management that Claude Code should have had
+- **Target User**: Terminal developers who use Claude Code but want better session visibility
+
+## Architecture Decisions
+- **Base**: Elia fork leveraging proven Textual UI framework
+- **Database**: Separate SQLite database at ~/.local/share/cafedelia/cafedelia.sqlite
+- **Integration**: Direct integration with Claude Code's __store.db for session discovery
+- **Models**: Focus on Claude Code's available models (Claude 3.5 Sonnet, Haiku, Opus)
+
+## Implementation Priorities
+1. **Model Configuration**: Replace Elia's general API providers with Claude Code models
+2. **Session Discovery**: Sync Claude Code sessions from ~/.claude/__store.db
+3. **Session Browser**: Visual interface for browsing Claude Code sessions by project
+4. **Session Management**: Tmux integration for session attachment and creation
+
+## Key Patterns
+- **Simplicity over Generality**: Build for Claude Code specifically, not generic CLI providers
+- **Terminal-Native**: Stay in terminal environment, no desktop context switching
+- **Session Intelligence**: Add progress tracking and session metadata that Claude Code lacks
+- **Preserve Workflow**: Integrate with existing Claude Code usage, don't replace it
+
+## Development Notes
+- Memory bank reflects focused Claude Code scope (not general CLI framework)
+- Welcome screen emphasizes Claude Code as primary and sole provider
+- Model selection should reflect Claude Code's available models
+- Session discovery uses Claude Code's existing database rather than filesystem parsing
