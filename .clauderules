@@ -1,0 +1,108 @@
+# Cafedelia Project Intelligence
+
+## Implementation Patterns
+
+### Hybrid Architecture Success
+- **JSONL + SQLite**: Successfully implemented dual-mode architecture with historical JSONL sync and live CLI integration
+- **Direct CLI Integration**: Abandoned tmux approach in favor of direct `claude -p --output-format stream-json` subprocess management
+- **Session Discovery**: ~2000 Claude Code sessions successfully discovered from `~/.claude/projects/` directory structure
+
+### Performance Lessons Learned
+- **UI Overload**: Loading 2000+ sessions at once causes significant interface sluggishness
+- **Pagination Required**: History widget needs lazy loading or pagination for large datasets
+- **Caching Strategy**: Session metadata should be cached and indexed for efficient browsing
+
+### Message Parsing Evolution ✅
+- **Tool Call Parsing**: SOLVED with unified ContentExtractor and StreamingMessageGrouper  
+- **JSON Complexity**: SOLVED with proper array/block handling for tool_use and tool_result
+- **Database Deduplication**: SOLVED with session_id field and unique constraints
+- **Current Issue**: Tool results still missing in live chat despite architectural fixes
+
+## Code Patterns
+
+### Claude Code CLI Integration
+```python
+# Successful pattern for CLI subprocess management
+cmd = ["claude", "-p", "--output-format", "stream-json"]
+if resume_session and self.session_id:
+    cmd.extend(["--resume", self.session_id])
+
+# Stream processing with proper error handling
+async for line in process.stdout:
+    try:
+        message_data = json.loads(line.decode('utf-8').strip())
+        response = self._parse_cli_message(message_data)
+    except json.JSONDecodeError:
+        # Handle malformed JSON gracefully
+        continue
+```
+
+### JSONL Processing Efficiency
+```python
+# Parse JSONL files without loading entire file into memory
+async def parse_jsonl_metadata(self, file_path: Path) -> SessionMetadata:
+    # Read first few lines for session info
+    # Read last few lines for recent activity
+    # Skip middle content for performance
+```
+
+## User Experience Insights
+
+### Session Browsing Expectations
+- Users expect fast session discovery and browsing
+- Large datasets need search/filter capabilities  
+- Session metadata (project, branch, last activity) is crucial for selection
+- Visual indicators for session status and activity are important
+
+### Performance Requirements
+- UI should remain responsive with 2000+ sessions
+- Session loading should be progressive/on-demand
+- Message streaming should provide immediate feedback
+- Error states need clear user communication
+
+## Technical Decisions
+
+### Architecture Choices
+- **Subprocess over SDK**: CLI approach works with subscription billing, SDK requires API key
+- **Direct CLI over tmux**: Simpler integration, better process control
+- **SQLite + JSONL hybrid**: Leverages Elia's existing database while supporting Claude Code's file format
+- **Textual framework**: Maintains professional terminal UI while adding CLI provider support
+
+### Performance Optimizations Needed
+1. **Lazy Loading**: Implement pagination for History widget
+2. **Message Parsing**: Fix tool call parsing for complete Claude Code support  
+3. **Caching**: Add session metadata indexing and caching
+4. **Progressive Loading**: Load session details on-demand
+
+## Development Environment (Updated July 21, 2025)
+- **Virtual Environment**: `/home/alex/code/cafedelia/.venv` (always activate before commands)
+- **Database**: `~/.local/share/cafedelia/cafedelia.sqlite` (NOT in project directory)  
+- **Installation**: `pipx install -e .` for global development access
+- **Reinstall**: `pipx uninstall cafedelia && pipx install -e .`
+
+## Recent Major Fixes (July 21, 2025) ✅
+- **Database Deduplication**: Fixed 15k duplicate entries, added session_id unique constraint
+- **Content Extraction Unification**: Created shared ContentExtractor for live/historical parity
+- **Streaming Message Grouper**: Implemented coherent conversation block display
+- **Migration System**: Database cleanup scripts and proper schema migration
+
+## Recent Major Achievements (July 21, 2025) ✅
+**Tool Use Display Parity**: SOLVED - Live streaming now shows rich tool formatting
+- Fixed type field mismatch in claude_process.py (`"type": "message"` → `"type": "assistant"`)
+- Live chat now displays: `🔧 **Used Bash** (toolu_01...) Parameters: command: ls -la`
+- Created CLI testing utility for non-interactive debugging
+
+**Split-Screen Log Viewer**: IMPLEMENTED - Real-time debugging interface
+- Side-by-side chat + raw JSON logs with F3 toggle
+- Automatic session ID capture and JSONL file tailing
+- Professional debugging experience with syntax highlighting
+
+## Current Issue: Live Chat Streaming Disconnect
+**Status**: Chat UI stops updating while logs continue showing responses
+**Critical Finding**: Claude Code subprocess working, issue in UI update pipeline
+**Evidence**: Log viewer shows active JSON while chat interface freezes
+
+## Next Phase Focus
+- Debug and fix live chat tool result display issue
+- Achieve complete UX parity between live and historical chat
+- UI/UX optimization and performance improvements
