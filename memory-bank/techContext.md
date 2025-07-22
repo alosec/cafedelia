@@ -66,13 +66,16 @@ rich = ">=13.0.0"              # Text rendering (Textual dependency)
 litellm = ">=1.0.0"            # LLM API abstraction (for API providers)
 ```
 
-#### New Dependencies (CLI Provider Support)
+#### New Dependencies (Claude Code Import Support)
 ```toml
-# Additional dependencies for CLI provider functionality
-libtmux = ">=0.30.0"           # Tmux session management
-aiofiles = ">=24.1.0"          # Async file operations for session discovery
-psutil = ">=5.9.0"             # Process monitoring for session health
+# Dependencies for Claude Code JSONL import functionality  
+# (Most functionality uses existing Elia dependencies)
+# click already included for CLI command structure
+# pathlib and json built into Python
+# asyncio patterns already used by Elia
 ```
+
+**Note**: Simplified approach requires minimal additional dependencies - leverages existing Elia stack
 
 #### Development Dependencies
 ```toml
@@ -161,19 +164,20 @@ sudo apt install git              # Repository management
 pip install pre-commit           # Git hooks for code quality
 ```
 
-#### Running Cafedelia
+#### Running Cafedelia  
 ```bash
 # Development mode
 python -m elia_chat
 
-# Production installation
+# Production installation 
 cafedelia
 
-# With specific CLI provider
-cafedelia --provider claude-code
+# Import Claude Code sessions (new functionality)
+cafedelia import claude_code                           # Interactive directory prompt
+cafedelia import claude_code -d /path/to/sessions     # Specific directory
 
-# Attach to existing session
-cafedelia --resume session-abc123
+# Import ChatGPT conversations (existing functionality preserved)
+cafedelia import chatgpt conversations.json
 ```
 
 ### Development Patterns
