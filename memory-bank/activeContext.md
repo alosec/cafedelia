@@ -2,9 +2,9 @@
 
 ## Current State  
 - **Date**: July 21, 2025
-- **Focus**: Chat Opening Performance & SQLite-First Architecture
-- **Status**: CRITICAL ISSUE - Chat opens hanging due to automatic JSONL log loading
-- **Next**: Reorient to SQLite-first UI data, lazy-load logs on F3 only
+- **Focus**: Multi-Message UI Implementation & Tool Representation
+- **Status**: WORKING MESSAGE STREAMING (0.5/1.0) - Individual chatbox mounting operational
+- **Next**: Refine tool use display and message flow accuracy
 
 ## Model Selection Implementation (July 21, 2025)
 
@@ -194,32 +194,42 @@ with RadioSet(id="provider-types"):
 - **Enhanced parsing logic** successfully processes `content: [{"type":"text","text":"..."}]` structures
 - **Perfect data integrity** maintained across entire JSONL dataset
 
-### 🚨 CRITICAL ISSUE IDENTIFIED: Chat Opening Performance (July 21, 2025)
+### 🎉 BREAKTHROUGH: Multi-Message Streaming Architecture (July 21, 2025)
 
-#### ❌ Chat Opening Hangs Problem
-**ROOT CAUSE DISCOVERED**: ChatScreen automatically loads JSONL logs for all sessions with session_id
+#### ✅ Message Streaming WORKING (0.5/1.0 Complete)
+**MAJOR ACHIEVEMENT**: Replaced single-chatbox overwriting with individual message widgets
 
-**Performance Impact:**
-- **Chat opens hang** during JSONL file I/O operations
-- **Automatic log loading** triggered by `_should_show_logs_by_default()` for all 416 synced sessions
-- **Heavy file operations** during chat compose/mount phase
-- **Poor user experience** with UI blocking on chat opening
+**Architecture Implemented:**
+- **SessionStateManager**: JSONL-database consistency coordination  
+- **ParityValidator**: Automatic sync validation and correction
+- **PersistenceCoordinator**: Robust database operations with datetime serialization
+- **Individual Chatbox Mounting**: Each Claude message creates separate widget (battle-tested pattern)
 
-#### 🎯 Immediate Priority: SQLite-First Architecture Pivot
-1. **Fix Automatic JSONL Loading** 🔥 URGENT
-   - Disable automatic SessionLogViewer loading in ChatScreen
-   - Only load logs when user explicitly presses F3
-   - Remove `_should_show_logs_by_default()` automatic behavior
+**Current Message Flow:**
+1. Claude Code stream → SessionStateManager → MessageDao persistence
+2. UI event → Individual Chatbox creation → Mount widget → AgentResponseComplete
+3. Battle-tested patterns from existing chat loading reused
 
-2. **SQLite-First UI Data** (Current)
-   - Pull all chat display data from database only
-   - Use JSONL files as background data source, not UI source
-   - Optimize database queries for fast chat opening
+#### 🎯 Current Issues (Remaining 0.5 work)
+**Tool Representation Problems Observed:**
+- **Empty chatboxes**: Purple boxes with truncated titles appearing
+- **Message duplication**: Pink assistant content + purple result content  
+- **Tool parsing**: Tool use showing but content extraction incomplete
+- **Flow accuracy**: 6 small empty Claude chatboxes suggest parsing issues
 
-3. **Optimized Log Loading** (Week 1)
-   - Intelligent JSON parsing with streaming
-   - Lazy loading with pagination for large log files
-   - Background processing for log viewer performance
+**User Report Summary:**
+- ✅ Smooth message flow overall
+- ✅ Pink chatboxes with agent responses working
+- ✅ Tool use detection operational  
+- ❌ Empty purple chatboxes with truncated titles
+- ❌ Duplication between assistant content and result content
+- ❌ Tool content not properly populating all widgets
+
+#### 🔧 Next Priority: Tool Content Accuracy
+1. **Debug empty chatboxes** - investigate truncated title and missing content
+2. **Fix message duplication** - ensure single representation per logical message
+3. **Enhance tool parsing** - improve content extraction for tool results  
+4. **Validate message flow** - eliminate spurious empty chatboxes
 
 ## Technical Context
 
@@ -269,20 +279,22 @@ with RadioSet(id="provider-types"):
 
 ## Next Actions
 
-### Immediate (This Week)
-1. **Complete Memory Bank Setup**: Finish system patterns, tech context, progress docs
-2. **Provider Architecture Design**: Detailed technical specification for CLI provider support
-3. **Elia Codebase Deep Dive**: Identify exact modification points for provider type separation
+### Immediate (This Session/Tomorrow)
+1. **Debug Empty Chatboxes**: Investigate purple boxes with truncated titles and missing content
+2. **Fix Message Duplication**: Resolve assistant content vs result content separation issues  
+3. **Enhance Tool Content Extraction**: Improve parsing for tool results and parameter display
+4. **Validate Message Flow**: Eliminate spurious empty chatboxes and ensure content accuracy
 
-### Short Term (Next 2 Weeks)
-1. **Implement Provider Type Selection**: Extend OptionsModal with API vs CLI separation
-2. **Claude Code Provider Definition**: Add CLI provider configuration to models
-3. **Session Discovery Prototype**: Basic Claude Code session scanning functionality
+### Short Term (Next Week)
+1. **Message Type Classification**: Refine message categorization and content routing logic
+2. **Tool Representation Polish**: Perfect tool use display formatting and parameter visibility
+3. **Content Extraction Debugging**: Validate ContentExtractor integration with new architecture
+4. **Stream Flow Optimization**: Ensure smooth message progression without UI artifacts
 
-### Medium Term (Next Month)
-1. **Tmux Integration**: Working session embedding in Textual interface
-2. **Session Management UI**: Complete session browser and attachment logic
-3. **Intelligence Foundation**: Basic background monitoring capabilities
+### Medium Term (Next 2 Weeks)
+1. **Live Chat UX Polish**: Achieve perfect parity with historical chat interface quality
+2. **Performance Optimization**: Optimize message mounting and rendering for large sessions
+3. **Error Handling Enhancement**: Robust recovery from streaming errors and parsing failures
 
 ## Key Decisions Made
 

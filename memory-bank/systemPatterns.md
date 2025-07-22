@@ -5,9 +5,42 @@
 ### Core Extension Strategy
 **Principle**: Extend Elia's proven patterns rather than replace them
 - Leverage existing Textual screen management
-- Extend model/provider system for CLI tools
+- Extend model/provider system for CLI tools  
 - Preserve all API provider functionality
 - Add CLI provider capabilities as new provider type
+
+## Multi-Message Streaming Architecture (July 2025)
+
+### State Management Pattern
+**Core Principle**: JSONL files as source of truth with database consistency validation
+
+#### SessionStateManager Coordination
+```python
+# Central coordinator ensuring JSONL-database-UI consistency
+session_state_manager.register_session(session_id, jsonl_path)
+session_state_manager.process_new_message(session_id, raw_json)
+# Emits ui_update_required events for individual message widgets
+```
+
+#### Individual Message Widget Pattern (Battle-Tested)
+```python
+# Each Claude Code message creates separate Chatbox widget
+chatbox = Chatbox(message=chat_message, model=model, classes=classes)
+self.chat_container.mount(chatbox)  # Proven pattern from existing chat loading
+self.post_message(AgentResponseComplete(message=chat_message, chatbox=chatbox))
+```
+
+**Key Insight**: Reuse existing chat loading patterns instead of custom UI handlers
+
+### Message Flow Architecture
+1. **Claude Code Stream** → **SessionStateManager** → **MessageDao persistence** 
+2. **UI Event** → **Individual Chatbox creation** → **Mount widget** → **AgentResponseComplete**
+3. **Battle-tested patterns** from chat.py:597-600 chatbox mounting reused
+
+### Robust Persistence Pattern
+- **ParityValidator**: Automatic JSONL↔database consistency checking
+- **PersistenceCoordinator**: Datetime serialization, robust database operations
+- **Atomic message registration**: Each JSON message immediately persisted individually
 
 ### Elia's Foundation (Inherited Strengths)
 
