@@ -42,7 +42,7 @@ class AppHeader(Widget):
         with Horizontal():
             with Vertical(id="cl-header-container"):
                 yield Label(
-                    Text("Elia") + Text(" v" + version("elia-chat"), style="dim"),
+                    Text("Cafedelia") + Text(" v" + version("cafedelia"), style="dim"),
                     id="elia-title",
                 )
             model_name_or_id = (

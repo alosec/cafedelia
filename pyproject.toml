@@ -1,9 +1,9 @@
 [project]
-name = "elia_chat"
+name = "cafedelia"
 version = "1.10.0"
-description = "A powerful terminal user interface for interacting with large language models."
+description = "Cafedelia - Terminal AI session management with CLI provider support. Elia fork with Claude Code integration."
 authors = [
-    { name = "Darren Burns", email = "darrenb900@gmail.com" }
+    { name = "Alex Losec", email = "alex@losec.dev" }
 ]
 dependencies = [
     "textual[syntax]==0.79.1",
@@ -23,6 +23,7 @@ readme = "README.md"
 requires-python = ">= 3.11"
 
 [project.scripts]
+cafedelia = "elia_chat.__main__:cli"
 elia = "elia_chat.__main__:cli"
 
 [build-system]
