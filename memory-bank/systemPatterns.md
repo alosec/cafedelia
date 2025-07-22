@@ -9,14 +9,14 @@
 - Preserve all existing API provider functionality
 - Add Claude Code import as data enhancement rather than new provider type
 
-### Strategic Pivot Rationale
-**Original Plan**: Complex CLI provider architecture with tmux integration
-**Revised Approach**: Simple import system using existing database schema
-**Benefits**: 
-- Faster implementation and immediate value
-- Validates core concept without architectural complexity
-- Leverages existing UI for browsing imported sessions
-- Proves data model compatibility before building specialized interfaces
+### Strategic Evolution - Robust Bidirectional Sync (July 22, 2025)
+**Original Plan**: Simple import system using existing database schema  
+**Current Approach**: Production-grade bidirectional synchronization with integrity guarantees
+**New Direction**: 
+- JSONL files and database are both authoritative in their domains
+- Real-time sync with atomic operations and conflict resolution
+- Foundation for future Phase 2: Claude Code as live provider
+- Bulletproof data integrity prevents corruption under concurrent access
 
 ### Elia's Foundation (Inherited Strengths)
 
@@ -430,4 +430,129 @@ CREATE TABLE session_intelligence (
 - **Theme System**: Visual customization capabilities
 - **Screen Management**: Navigation and modal patterns
 
-This architecture preserves Elia's strengths while adding the CLI provider capabilities needed to transform it into a comprehensive AI session management platform.
+### Robust Sync Architecture Patterns (Current Focus)
+
+#### Bidirectional Sync Engine
+```python
+# New robust sync architecture
+class SyncEngine:
+    """Production-grade bidirectional synchronization between JSONL and database"""
+    
+    def __init__(self):
+        self.lock_manager = DistributedLockManager()
+        self.change_detector = JSONLChangeDetector()
+        self.validator = DataValidator()
+        self.circuit_breaker = BackendCircuitBreaker()
+    
+    async def sync_with_integrity(self, session_path: Path) -> SyncResult:
+        # Atomic operations with proper error handling
+        async with self.lock_manager.acquire(session_path):
+            if not await self.change_detector.has_changes(session_path):
+                return SyncResult.no_changes_needed()
+            
+            # Validate data integrity before processing
+            validation = await self.validator.validate_jsonl_file(session_path)
+            if not validation.is_valid:
+                return SyncResult.validation_failed(validation.errors)
+            
+            # Process changes with transaction safety
+            async with database_transaction() as tx:
+                try:
+                    result = await self._process_changes(session_path, tx)
+                    await tx.commit()
+                    return result
+                except Exception as e:
+                    await tx.rollback()
+                    raise SyncError(f"Sync failed, changes rolled back: {e}")
+```
+
+#### Change Detection and Atomic Operations
+```python
+class JSONLChangeDetector:
+    """Detect incremental changes in JSONL files with atomic write detection"""
+    
+    async def has_changes(self, path: Path) -> bool:
+        current_signature = await self.get_file_signature(path)
+        cached_signature = await self.get_cached_signature(path)
+        return current_signature != cached_signature
+    
+    async def wait_for_write_completion(self, path: Path, timeout: int = 5) -> bool:
+        """Wait for JSONL file to finish being written by Claude Code"""
+        # Monitor file size stability to detect write completion
+        stable_size = None
+        for _ in range(timeout * 10):  # Check every 100ms
+            current_size = path.stat().st_size
+            if stable_size == current_size:
+                return True
+            stable_size = current_size
+            await asyncio.sleep(0.1)
+        return False
+```
+
+#### Data Integrity Validation  
+```python
+class DataValidator:
+    """Comprehensive validation pipeline for JSONL and session data"""
+    
+    async def validate_jsonl_file(self, path: Path) -> ValidationResult:
+        """Validate JSONL file integrity and completeness"""
+        try:
+            # Check file is not being written
+            if not await self.is_file_stable(path):
+                return ValidationResult.file_unstable()
+            
+            # Validate JSONL format
+            line_count = 0
+            for line_num, line in enumerate(await self._read_lines(path)):
+                try:
+                    data = json.loads(line)
+                    line_count += 1
+                except json.JSONDecodeError as e:
+                    return ValidationResult.malformed_json(line_num, e)
+            
+            return ValidationResult.valid(line_count)
+        except Exception as e:
+            return ValidationResult.file_error(e)
+```
+
+#### Conflict Resolution Strategy
+```python
+class ConflictResolver:
+    """Handle cases where JSONL and database disagree on session data"""
+    
+    async def resolve_conflict(self, jsonl_data: dict, db_data: dict) -> dict:
+        """Resolve conflicts with JSONL as source of truth for content, DB for metadata"""
+        resolved = {}
+        
+        # JSONL wins for content and session data
+        resolved['title'] = jsonl_data.get('title') or db_data.get('title')
+        resolved['model'] = jsonl_data.get('model') or db_data.get('model')
+        resolved['messages'] = jsonl_data.get('messages', [])
+        
+        # Database wins for UI-specific metadata  
+        resolved['last_accessed'] = db_data.get('last_accessed')
+        resolved['favorite'] = db_data.get('favorite', False)
+        resolved['tags'] = db_data.get('tags', [])
+        
+        return resolved
+```
+
+#### Real-time File Watching Integration
+```python
+class JSONLWatcher:
+    """Real-time file system watching for immediate sync triggers"""
+    
+    async def watch_projects_directory(self, callback: Callable):
+        """Watch ~/.claude/projects/ for changes and trigger sync"""
+        import asyncio
+        from watchfiles import awatch
+        
+        async for changes in awatch(self.projects_path):
+            for change_type, path in changes:
+                if path.suffix == '.jsonl':
+                    # Wait for write completion before syncing
+                    if await self.change_detector.wait_for_write_completion(Path(path)):
+                        await callback(Path(path), change_type)
+```
+
+This robust sync architecture ensures data integrity while maintaining the performance and user experience needed for real-time session management. It provides the bulletproof foundation required for Phase 2 where Claude Code becomes a live provider rather than just an import source.

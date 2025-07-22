@@ -3,8 +3,8 @@
 ## Current State  
 - **Date**: July 22, 2025
 - **Branch**: voyager 
-- **Focus**: Claude Code Import System Modularization Complete
-- **Status**: Successful modularization of import system with proper separation of concerns
+- **Focus**: Robust Bidirectional Sync Architecture Implementation
+- **Status**: Shifting from simple import to production-grade bidirectional synchronization between JSONL and database
 
 ## Cafedelia Fork Strategy (July 20, 2025)
 
@@ -148,22 +148,39 @@
 
 **Validation**: Cafedelia's approach aligns with proven workflow patterns
 
+## Strategic Pivot: Robust Bidirectional Sync (July 22, 2025)
+
+### Critical Discovery: Data Integrity Issues
+**Problem Identified**: Current sync system has fundamental robustness gaps
+- Race conditions during JSONL file reading while Claude Code writes
+- No distributed locking for concurrent sync processes  
+- Fragile duplicate detection using JSON meta fields
+- No transaction rollbacks for interrupted operations
+- Generic titles/models overriding extracted session data
+
+### New Direction: Production-Grade Sync Architecture
+**Decision**: Move from simple import to bulletproof bidirectional synchronization
+**Rationale**: Need robust foundation for Phase 2 (Claude Code as provider)
+
 ## Next Actions
 
-### Immediate (This Week)
-1. **Complete Memory Bank Setup**: Finish system patterns, tech context, progress docs
-2. **Provider Architecture Design**: Detailed technical specification for CLI provider support
-3. **Elia Codebase Deep Dive**: Identify exact modification points for provider type separation
+### Immediate (This Week) - Sync Robustness
+1. **Implement Atomic File Operations**: Detect when JSONL files are fully written vs partially updated
+2. **Add Distributed Locking**: Prevent multiple sync processes from corrupting data
+3. **Fix Data Integrity**: Use real titles/models from JSONL instead of generic overrides
+4. **Transaction Management**: Proper rollback capabilities for interrupted operations
 
-### Short Term (Next 2 Weeks)
-1. **Implement Provider Type Selection**: Extend OptionsModal with API vs CLI separation
-2. **Claude Code Provider Definition**: Add CLI provider configuration to models
-3. **Session Discovery Prototype**: Basic Claude Code session scanning functionality
+### Short Term (Next 2 Weeks) - Enhanced Sync Engine
+1. **Change Detection System**: Only sync when JSONL files actually change (checksums/timestamps)
+2. **Conflict Resolution**: Handle cases where database and JSONL disagree
+3. **Circuit Breaker Pattern**: Prevent cascading failures from backend issues
+4. **Data Validation Pipeline**: Verify integrity before persistence
 
-### Medium Term (Next Month)
-1. **Tmux Integration**: Working session embedding in Textual interface
-2. **Session Management UI**: Complete session browser and attachment logic
-3. **Intelligence Foundation**: Basic background monitoring capabilities
+### Medium Term (Next Month) - Live Bidirectional Sync
+1. **Real-time File Watching**: fs.watch integration for immediate sync triggers
+2. **Write-back Capability**: Enable database → JSONL sync for future provider mode
+3. **Session Lifecycle Management**: Handle session creation/termination events
+4. **Performance Optimization**: Bulk operations, connection pooling, caching
 
 ## Key Decisions Made
 

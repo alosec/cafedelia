@@ -1,10 +1,10 @@
 # Progress
 
-## Current Status: Import System Modularization Complete
+## Current Status: Pivoting to Robust Bidirectional Sync 
 **Date**: July 22, 2025  
 **Branch**: voyager
-**Phase**: Modular Import Architecture Complete - Professional Code Organization Achieved
-**Next Phase**: Enhanced Testing and Additional Import Sources
+**Phase**: Critical Architecture Shift - From Import to Production-Grade Sync
+**Next Phase**: Bulletproof Bidirectional Synchronization with Integrity Guarantees
 
 ## Completed Milestones ✅
 
@@ -171,19 +171,21 @@ EliaChatModel(
 - **Content Extraction Patterns**: Robust handling of mixed content types
 - **Metadata Strategy**: Rich context preservation in existing meta field
 
-## Next Phase: Enhanced Testing and Import Expansion ✅
+## Strategic Pivot: Robust Bidirectional Sync Architecture ⚠️
 
-### Ready for Testing Development
-- [x] **Modular Foundation**: Professional service architecture ready for comprehensive testing
-- [x] **Service Isolation**: Each service can be independently mocked and tested
-- [x] **Clear Interfaces**: Well-defined service contracts enable robust test development
-- [x] **Architecture Validation**: Modular approach proven with 435 session import success
+### Critical Discovery: Current Implementation Insufficient
+- [x] **Data Integrity Issues Identified**: Race conditions, duplicate creation, generic data override
+- [x] **Sync Robustness Assessment**: Current approach unsuitable for production use
+- [x] **Architecture Gap Analysis**: Missing distributed locking, atomic operations, conflict resolution
 
-### Next Implementation Steps (Current Focus)
-1. **Testing Infrastructure**: Comprehensive test suite for each service
-2. **Service Enhancement**: Add caching, validation, and error recovery features
-3. **Additional Import Sources**: Leverage modular pattern for new data sources
-4. **Documentation**: API documentation for import service architecture
+### New Direction: Production-Grade Sync (Current Focus)
+1. **Atomic File Operations**: JSONL write completion detection before processing
+2. **Distributed Lock Manager**: Prevent concurrent sync processes from corrupting data  
+3. **Real Data Extraction**: Use actual JSONL titles/models instead of generic overrides
+4. **Transaction Safety**: Proper rollback mechanisms for interrupted operations
+5. **Change Detection**: Only sync when files actually change (performance + integrity)
+6. **Conflict Resolution**: Handle disagreements between JSONL and database state
+7. **Circuit Breaker Pattern**: Prevent cascading failures from backend/network issues
 
 ## Known Challenges and Solutions
 
@@ -230,32 +232,31 @@ EliaChatModel(
 - **Feature Scope Creep**: Maintain focus on core session management value
 - **Competition from Desktop Tools**: Emphasize terminal-native advantages
 
-## Immediate Next Steps (Docker Implementation)
+## Immediate Next Steps: Robust Sync Implementation 
 
-### PRIORITY: Deployment Robustness (Week 1)
-**Issue**: Setup script `./scripts/setup-cafed.sh` hanging without verbose output
-**Solution**: Docker containerization for robust deployment
+### PRIORITY: Data Integrity Architecture (Week 1)
+**Critical Issue**: Current sync creates duplicates with fake data, vulnerable to race conditions
+**Solution**: Implement production-grade sync with atomic operations and integrity guarantees
 
-#### Docker Implementation Plan
-- [ ] **Create Dockerfile**: Multi-stage build for TypeScript + Python environment
-- [ ] **Docker Compose**: Services for cafed backend and development workflow  
-- [ ] **Environment Variables**: Configurable ports, paths, logging levels
-- [ ] **Volume Mounts**: ~/.claude/projects/ access for session discovery
-- [ ] **Health Checks**: Proper container health monitoring
-- [ ] **Development Mode**: Hot reload for both TypeScript and Python changes
+#### Core Sync Robustness Implementation
+- [ ] **Fix Title/Model Extraction**: Backend extracts real session data from JSONL summary entries
+- [ ] **Bridge Data Integrity**: Use extracted titles/models instead of generic overrides  
+- [ ] **Atomic Write Detection**: Detect JSONL file completion before processing
+- [ ] **Duplicate Prevention**: Robust session identification beyond fragile JSON meta fields
+- [ ] **Transaction Management**: Database operations wrapped in transactions with rollback
 
-#### Docker Benefits
-- **Consistent Environment**: Eliminates Node.js version and dependency issues
-- **Easy Launch**: Single `docker-compose up` command
-- **Process Management**: Proper service orchestration and restart policies  
-- **Isolation**: Clean separation between host system and cafedelia services
-- **Development Workflow**: Simplified onboarding for contributors
+#### Advanced Sync Engine (Week 2)
+- [ ] **Distributed Locking**: Prevent concurrent sync processes with file-based locks
+- [ ] **Change Detection**: File signature comparison to avoid unnecessary processing
+- [ ] **Data Validation**: Comprehensive JSONL integrity checking before persistence
+- [ ] **Conflict Resolution**: Handle cases where JSONL and database disagree
+- [ ] **Circuit Breaker**: Graceful degradation when backend fails
 
-### Phase 3: UI Integration (Week 2)
-- [ ] **Session Browser Widget**: Visual Claude Code session selection
-- [ ] **Intelligence Display**: Show session summaries and progress
-- [ ] **Backend Health Monitoring**: UI indicators for cafed service status
-- [ ] **Real-time Updates**: WebSocket or polling for live session data
+#### Real-time Sync Infrastructure (Week 3)
+- [ ] **File System Watching**: fs.watch integration for immediate sync triggers
+- [ ] **Incremental Sync**: Process only changed portions of JSONL files
+- [ ] **Performance Optimization**: Connection pooling, bulk operations, caching
+- [ ] **Health Monitoring**: Comprehensive sync process observability
 
 ## Next Phase Preparation
 
