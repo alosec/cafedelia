@@ -7,7 +7,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
 
-sqlite_file_name = data_directory() / "elia.sqlite"
+sqlite_file_name = data_directory() / "cafedelia.sqlite"
 sqlite_url = f"sqlite+aiosqlite:///{sqlite_file_name}"
 engine = create_async_engine(sqlite_url)
 
