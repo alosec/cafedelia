@@ -1,238 +1,286 @@
-<h1 align="center">
-    Cafedelia
-</h1>
-<p align="center">
-  <i align="center">Terminal AI session management platform - Beautiful UI meets serious workflow orchestration</i><br>
-  <i align="center">Fork of Elia with Claude Code CLI provider integration for professional AI-assisted development</i>
-</p>
+# Cafedelia - Terminal AI Session Management
 
-![elia-screenshot-collage](https://github.com/darrenburns/elia/assets/5740731/75f8563f-ce1a-4c9c-98c0-1bd1f7010814)
+Cafedelia transforms the terminal AI development experience from isolated conversations to orchestrated workflow management. Built as a strategic fork of [Elia](https://github.com/darrenburns/elia), it combines Elia's beautiful Textual interface with serious Claude Code session management capabilities.
 
-## Introduction
+## Architecture: Elia UI + Cafed Backend
 
-**Cafedelia** transforms Elia from a beautiful terminal chat wrapper into a comprehensive AI session management platform. Built for terminal developers who want the polish of Elia's Textual UI combined with the power of Claude Code's workflow capabilities.
+```
+┌─────────────────────────────────────┐
+│           CAFEDELIA UI              │
+│         (Elia Textual)              │
+│  ┌─────────────────────────────────┐ │
+│  │ Screens: Home, Chat, Sessions   │ │
+│  │ Widgets: Session Browser,       │ │
+│  │          Intelligence Display   │ │
+│  │ Database: Extended Elia Schema  │ │
+│  └─────────────────────────────────┘ │
+└─────────────┬───────────────────────┘
+              │ HTTP/WebSocket API
+              ▼
+┌─────────────────────────────────────┐
+│           CAFED BACKEND             │
+│       (TypeScript Express)          │
+│  ┌─────────────────────────────────┐ │
+│  │ WTE Pipeline:                   │ │
+│  │ - Watch: ~/.claude/projects/    │ │
+│  │ - Transform: JSONL → Elia       │ │
+│  │ - Execute: Database Updates     │ │
+│  │                                 │ │
+│  │ Services:                       │ │
+│  │ - Claude Discovery              │ │
+│  │ - Session Intelligence          │ │
+│  │ - Project Organization          │ │
+│  └─────────────────────────────────┘ │
+└─────────────┬───────────────────────┘
+              │
+              ▼
+┌─────────────────────────────────────┐
+│     ~/.claude/projects/             │
+│   ┌─── project-uuid-1/ ──────────┐   │
+│   │   session-abc123.jsonl      │   │
+│   │   session-def456.jsonl      │   │
+│   └─────────────────────────────┘   │
+└─────────────────────────────────────┘
+```
 
-### The Vision
+## What Makes Cafedelia Different
 
-Existing terminal LLM tools fall into limited categories:
-- **Chat Wrappers** (Elia, basic clients): Beautiful interfaces but no workflow capabilities  
-- **Workflow Tools** (Claude Code, Aider): Powerful agents but primitive session management
+### vs Pure Elia
+- **Workflow Management**: Real AI session orchestration vs simple chat
+- **CLI Tool Integration**: Bridge to powerful development tools like Claude Code
+- **Session Persistence**: Background session management vs ephemeral conversations
 
-**Cafedelia bridges this gap** - terminal-native session management with serious workflow orchestration.
+### vs Desktop Session Managers (Crystal, Conductor) 
+- **Terminal-Native**: No context switching from developer environment
+- **Textual Framework**: Rich terminal UI capabilities with professional polish
+- **Integration Depth**: Native Claude Code filesystem integration
 
-### Key Features
+### vs Other Terminal LLM Tools
+- **Framework Choice**: Textual vs ubiquitous Rust/Ratatui alternatives
+- **Session Focus**: Intelligence layer for workflow management vs simple chat interfaces
+- **Extensible Backend**: TypeScript Express backend with Watch-Transform-Execute pipeline
 
-- **CLI Provider Support**: Beyond API providers, integrate tools like Claude Code as first-class citizens
-- **Session Discovery**: Find and manage existing Claude Code sessions from the filesystem
-- **Tmux Integration**: Embed terminal sessions within the beautiful Textual interface
-- **Session Intelligence**: Background monitoring and workflow coordination
-- **Terminal-Native**: No context switching to desktop applications
+## Key Features (Implemented)
 
-Built on Elia's proven foundation: SQLite persistence, robust configuration, professional UI patterns, and theme system.
+### 🔧 Hybrid Architecture
+- **Elia Frontend**: Proven Textual interface with beautiful themes and navigation
+- **Cafed Backend**: TypeScript Express server with Claude Code integration
+- **Bridge Layer**: Python HTTP client connecting UI to backend services
 
-## Installation
+### 📁 Claude Code Discovery
+- **Session Scanning**: Automatic discovery of ~/.claude/projects/ sessions
+- **JSONL Parsing**: Extract conversation turns, costs, file operations from session logs
+- **Project Organization**: Decode Claude's directory encoding to filesystem paths
 
-> **Status**: In Development - Cafedelia is currently being built as an Elia fork with CLI provider support.
+### 💾 Database Integration
+- **Extended Schema**: New tables for Claude Code session tracking
+- **Session Intelligence**: AI-generated summaries and insights
+- **Relationship Mapping**: Link Claude sessions to Elia chat conversations
 
-**Current Phase**: Implementing provider type separation and Claude Code integration.
+### 🔄 Real-time Synchronization
+- **Session Sync**: Background sync between cafed backend and Elia database  
+- **Health Monitoring**: Backend process management and health checks
+- **Intelligence Updates**: Track session progress and file operations
+
+## Quick Start
 
 ### Prerequisites
-
 - Python 3.11+
-- Claude Code CLI (`pip install claude-cli`)
-- tmux (for session management)
+- Node.js 18+
+- Claude Code CLI installed and used (creates ~/.claude/projects/)
 
-### Development Installation
+### Installation
 
 ```bash
+# Clone cafedelia repository
 git clone https://github.com/alosec/cafedelia.git
 cd cafedelia
+
+# Install Python dependencies
 pip install -e .
+
+# Setup backend (installs Node.js deps and builds TypeScript)
+./scripts/setup-cafed.sh
 ```
 
-### Environment Setup
+### Usage
 
-For API providers, set environment variables:
-- `OPENAI_API_KEY` - For ChatGPT models
-- `ANTHROPIC_API_KEY` - For Claude models  
-- `GEMINI_API_KEY` - For Google models
-
-For Claude Code integration:
-- Ensure `claude code` command is available
-- Existing Claude Code sessions will be auto-discovered
-
-## Usage
-
-### API Providers (Inherited from Elia)
-
-Launch with traditional chat interface:
 ```bash
-cafedelia -m gpt-4o "Help me debug this function"
+# Start Cafedelia (automatically starts cafed backend)
+cafedelia
+
+# Or use elia command for compatibility
+elia
 ```
 
-### CLI Providers (Cafedelia Innovation)
+The application will:
+1. Start the cafed backend server on port 8001
+2. Scan ~/.claude/projects/ for existing sessions
+3. Sync session data to local SQLite database
+4. Display sessions alongside regular Elia chats
 
-**Session Discovery**: Browse existing Claude Code sessions
+## Development
+
+### Backend Development
+
 ```bash
-cafedelia --provider claude-code --list-sessions
+# Start backend in development mode
+cd cafed
+npm run dev
+
+# Build TypeScript
+npm run build
+
+# Type checking
+npm run type-check
 ```
 
-**Session Management**: Launch or resume sessions in terminal UI
-```bash
-cafedelia --provider claude-code --session my-project
+### API Endpoints
+
+The cafed backend provides REST API endpoints:
+
+- `GET /health` - Health check
+- `GET /api/sessions` - List all Claude Code sessions
+- `GET /api/sessions/:id` - Get specific session
+- `GET /api/projects` - List all projects
+- `GET /api/summary` - Session summary statistics
+
+### Database Migrations
+
+Cafedelia extends Elia's database schema:
+
+```sql
+-- New tables for Claude Code integration
+CREATE TABLE claude_session (
+    session_uuid TEXT UNIQUE,
+    project_name TEXT,
+    project_path TEXT, 
+    status TEXT,
+    conversation_turns INTEGER,
+    total_cost_usd REAL,
+    file_operations JSON,
+    intelligence_summary TEXT,
+    -- ... timestamps, relationships
+);
+
+CREATE TABLE session_intelligence (
+    session_uuid TEXT,
+    summary_type TEXT,
+    summary_content TEXT,
+    confidence_score REAL,
+    -- ... metadata
+);
 ```
 
-**Background Intelligence**: Monitor active sessions
-```bash
-cafedelia --monitor --session-intelligence
+## Project Structure
+
+```
+cafedelia/
+├── elia_chat/                    # Elia UI (inherited + extensions)
+│   ├── app.py                   # Main app with cafed integration  
+│   ├── database/
+│   │   ├── models.py            # Extended with Claude session models
+│   │   └── migrations/          # Database schema updates
+│   └── screens/                 # UI screens (home, chat, sessions)
+│
+├── cafed/                       # TypeScript backend
+│   ├── core/                    # WTE pipeline interfaces
+│   ├── services/                # Claude discovery and session services
+│   ├── api/                     # HTTP API routes
+│   ├── database/                # Path mappings and utilities
+│   └── index.ts                 # Express server entry point
+│
+├── bridge/                      # Python ↔ TypeScript bridge
+│   ├── cafed_client.py         # HTTP client for backend API
+│   └── session_sync.py         # Database synchronization
+│
+└── scripts/                     # Management and setup scripts
+    ├── setup-cafed.sh          # Install and build backend
+    └── start-cafed.sh          # Start backend server
 ```
 
-## Running local models
+## Technical Implementation
 
-1. Install [`ollama`](https://github.com/ollama/ollama).
-2. Pull the model you require, e.g. `ollama pull llama3`.
-3. Run the local ollama server: `ollama serve`.
-4. Add the model to the config file (see below).
+### Watch-Transform-Execute Pipeline
 
-## Configuration
-
-Cafedelia extends Elia's configuration system with CLI provider support. Configuration location shown in options window (`ctrl+o`).
-
-### Basic Configuration
-
-```toml
-# Default provider selection
-default_provider_type = "cli"  # "api" or "cli"
-default_model = "claude-code-session"
-
-# UI preferences  
-theme = "galaxy"
-message_code_theme = "dracula"
+```typescript
+interface WTE<T, A> {
+  watch: () => AsyncGenerator<T>;      // Watch JSONL files
+  transform: (event: T) => A | null;   // Transform to Elia format  
+  execute: (action: A) => Promise<void>; // Update Elia database
+}
 ```
 
-### API Providers (Inherited from Elia)
+### Session Discovery
 
-```toml
-[[models]]
-name = "gpt-4o"
-provider_type = "api"  # explicit for clarity
-
-[[models]]
-name = "ollama/llama3"
-provider_type = "api"
-
-[[models]]
-name = "groq/llama2-70b-4096"
-display_name = "Llama 2 70B"
-provider = "Groq"
-provider_type = "api"
+```typescript
+class ClaudeDiscovery {
+  // Scan ~/.claude/projects/ directories
+  async findAllProjects(): Promise<ClaudeProject[]>
+  
+  // Parse JSONL session files
+  async parseSessionFile(path: string): Promise<ClaudeSession>
+  
+  // Decode Claude's path encoding
+  decodeProjectPath(encoded: string): string
+}
 ```
 
-### CLI Providers (Cafedelia Innovation)
+### Database Bridge
 
-```toml
-# Claude Code integration
-[[models]]
-id = "claude-code-session"
-name = "Claude Code"
-display_name = "Claude Code Session"
-provider_type = "cli"
-cli_command = "claude code"
-session_manager = "tmux"
-
-# Future CLI providers
-[[models]]
-id = "aider-session"  
-name = "Aider"
-display_name = "Aider Coding Assistant"
-provider_type = "cli"
-cli_command = "aider"
-session_manager = "tmux"
+```python
+class SessionSync:
+  # Sync all sessions from backend to database
+  async sync_all_sessions() -> dict
+  
+  # Add intelligence summaries
+  async add_intelligence(session_uuid: str, summary: str)
+  
+  # Health check both systems
+  async health_check() -> dict
 ```
 
-### Session Management
+## Roadmap
 
-```toml
-[session_management]
-# Session discovery settings
-auto_discover = true
-session_timeout = "1h"
-background_monitoring = true
+### Phase 1: Core Integration ✅
+- [x] Hybrid architecture setup
+- [x] Claude Code session discovery  
+- [x] Database schema extensions
+- [x] Backend API implementation
+- [x] Python-TypeScript bridge
 
-# Tmux integration
-tmux_session_prefix = "cafedelia"
-tmux_control_mode = true
-```
+### Phase 2: UI Integration (In Progress)
+- [ ] Session browser widget
+- [ ] Intelligence display widget  
+- [ ] Session management screen
+- [ ] Real-time session monitoring
 
-## Custom themes
+### Phase 3: Advanced Features (Planned)
+- [ ] Watch-Transform-Execute pipeline for live updates
+- [ ] Session intelligence with AI summaries
+- [ ] Cross-session task delegation
+- [ ] Git worktree integration
 
-Add a custom theme YAML file to the themes directory.
-You can find the themes directory location by pressing `ctrl+o` on the home screen and looking for the `Themes directory` line.
+### Phase 4: Ecosystem (Future)
+- [ ] Additional CLI provider support (Aider, other tools)
+- [ ] MCP (Model Context Protocol) integration
+- [ ] Team collaboration features
+- [ ] Plugin ecosystem
 
-Here's an example of a theme YAML file:
+## Philosophy
 
-```yaml
-name: example  # use this name in your config file
-primary: '#4e78c4'
-secondary: '#f39c12'
-accent: '#e74c3c'
-background: '#0e1726'
-surface: '#17202a'
-error: '#e74c3c'  # error messages
-success: '#2ecc71'  # success messages
-warning: '#f1c40f'  # warning messages
-```
+**"The session intelligence layer that should have existed from the beginning"**
 
-## Changing keybindings
-
-Right now, keybinds cannot be changed. Terminals are also rather limited in what keybinds they support.
-For example, pressing <kbd>Cmd</kbd>+<kbd>Enter</kbd> to send a message is not possible (although we may support a protocol to allow this in some terminals in the future).
-
-For now, I recommend you map whatever key combo you want at the terminal emulator level to send `\n`.
-Here's an example using iTerm:
-
-<img width="848" alt="image" src="https://github.com/darrenburns/elia/assets/5740731/94b6e50c-429a-4d17-99c2-affaa828f35b">
-
-With this mapping in place, pressing <kbd>Cmd</kbd>+<kbd>Enter</kbd> will send a message to the LLM, and pressing <kbd>Enter</kbd> alone will create a new line.
-
-## Development Status
-
-Cafedelia is actively being developed as an Elia fork. Current implementation phases:
-
-### ✅ Completed
-- [x] **Project Foundation**: Memory bank, architecture documentation
-- [x] **Repository Setup**: Clean fork with independent git history  
-- [x] **Vision Definition**: Clear product strategy and technical approach
-
-### 🚧 In Progress  
-- [ ] **Provider Type Separation**: Extend OptionsModal for API vs CLI selection
-- [ ] **Claude Code Integration**: Session discovery and management
-- [ ] **Tmux Embedding**: Terminal session display within Textual interface
-
-### 📋 Planned
-- [ ] **Session Intelligence**: Background monitoring and summarization
-- [ ] **Cross-Session Coordination**: Workflow orchestration capabilities
-- [ ] **Additional CLI Providers**: Aider, other AI development tools
+Cafedelia bridges the gap between beautiful terminal chat tools (like Elia) and powerful CLI agents (like Claude Code) by adding the missing session management and intelligence layer. It preserves developer flow while adding serious workflow orchestration capabilities.
 
 ## Contributing
 
-Cafedelia represents the missing link between beautiful terminal interfaces and serious AI workflow management. We're building the session intelligence layer that should have existed from the beginning.
+Cafedelia builds on the excellent foundation of [Elia](https://github.com/darrenburns/elia) by Darren Burns. We maintain compatibility with Elia's patterns while extending capabilities for AI session management.
 
-**Areas of Focus**:
-- Textual UI development and tmux integration
-- AI workflow orchestration patterns
-- Terminal-native session management
-- Claude Code and AI tool integrations
+## License
 
-## Project Goals
+Licensed under the same terms as Elia. See LICENSE file for details.
 
-Transform terminal AI interaction from simple chat to comprehensive session management:
+---
 
-1. **Preserve Elia's Strengths**: Beautiful UI, robust configuration, professional patterns
-2. **Add CLI Provider Support**: First-class integration with tools like Claude Code  
-3. **Enable Session Intelligence**: Background monitoring and workflow coordination
-4. **Stay Terminal-Native**: No desktop context switching required
-
-## Acknowledgments
-
-Built upon [Elia](https://github.com/darrenburns/elia) by Darren Burns - an excellent foundation for terminal LLM interaction that deserved serious workflow capabilities.
+*Transform your terminal AI development experience with Cafedelia - where beautiful interfaces meet serious workflow management.*

@@ -100,3 +100,90 @@ class ChatDao(AsyncAttrs, SQLModel, table=True):
             chat.title = new_title
             session.add(chat)
             await session.commit()
+
+
+class ClaudeSessionDao(AsyncAttrs, SQLModel, table=True):
+    __tablename__ = "claude_session"
+
+    id: int | None = Field(default=None, primary_key=True)
+    session_uuid: str = Field(index=True, unique=True)
+    """Claude Code session UUID"""
+    project_name: str
+    """Project name from Claude Code"""
+    project_path: str
+    """Decoded filesystem path of the project"""
+    status: str = Field(default="inactive")
+    """Session status: 'active' | 'inactive'"""
+    conversation_turns: int = Field(default=0)
+    """Number of conversation turns in the session"""
+    total_cost_usd: float = Field(default=0.0)
+    """Total cost in USD for this session"""
+    file_operations: list[str] = Field(sa_column=Column(JSON), default=[])
+    """List of file paths that were operated on"""
+    jsonl_file_path: str
+    """Path to the JSONL session file"""
+    created_at: datetime | None = Field(
+        sa_column=Column(DateTime(), server_default=func.now())
+    )
+    last_activity: datetime | None = Field(
+        sa_column=Column(DateTime(), server_default=func.now())
+    )
+    intelligence_summary: str | None = Field(default=None)
+    """AI-generated summary of session progress and context"""
+    
+    # Relationship to associated chat if this session has been imported
+    chat_id: Optional[int] = Field(foreign_key="chat.id", default=None)
+    chat: Optional["ChatDao"] = Relationship()
+
+    @staticmethod
+    async def find_by_uuid(session_uuid: str) -> Optional["ClaudeSessionDao"]:
+        """Find Claude session by UUID"""
+        async with get_session() as session:
+            statement = select(ClaudeSessionDao).where(
+                ClaudeSessionDao.session_uuid == session_uuid
+            )
+            result = await session.exec(statement)
+            return result.first()
+
+    @staticmethod
+    async def all_active() -> list["ClaudeSessionDao"]:
+        """Get all active Claude Code sessions"""
+        async with get_session() as session:
+            statement = (
+                select(ClaudeSessionDao)
+                .where(ClaudeSessionDao.status == "active")
+                .order_by(desc(ClaudeSessionDao.last_activity))
+            )
+            results = await session.exec(statement)
+            return list(results)
+
+    @staticmethod
+    async def all_by_project(project_path: str) -> list["ClaudeSessionDao"]:
+        """Get all sessions for a specific project"""
+        async with get_session() as session:
+            statement = (
+                select(ClaudeSessionDao)
+                .where(ClaudeSessionDao.project_path == project_path)
+                .order_by(desc(ClaudeSessionDao.last_activity))
+            )
+            results = await session.exec(statement)
+            return list(results)
+
+
+class SessionIntelligenceDao(AsyncAttrs, SQLModel, table=True):
+    __tablename__ = "session_intelligence"
+
+    id: int | None = Field(default=None, primary_key=True)
+    session_uuid: str = Field(foreign_key="claude_session.session_uuid", index=True)
+    session: ClaudeSessionDao = Relationship()
+    timestamp: datetime | None = Field(
+        sa_column=Column(DateTime(), server_default=func.now())
+    )
+    summary_type: str
+    """Type of summary: 'progress', 'error', 'completion', 'file_changes'"""
+    summary_content: str
+    """The actual intelligence summary content"""
+    confidence_score: float = Field(default=1.0)
+    """Confidence score for this intelligence (0.0-1.0)"""
+    extra_metadata: dict[Any, Any] = Field(sa_column=Column(JSON), default={})
+    """Additional metadata for the intelligence entry"""
