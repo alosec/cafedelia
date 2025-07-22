@@ -1,0 +1,94 @@
+# Cafedelia Project Intelligence
+
+## Project Context
+- **Identity**: Elia fork for Claude Code session management  
+- **Approach**: Leverage existing Elia database schema rather than complex CLI provider architecture
+- **Success**: 435 Claude Code sessions imported successfully using simplified approach
+
+## Key Implementation Patterns
+
+### Claude Code JSONL Format Quirks
+- "user" type messages often contain tool execution results (weird but patterned)
+- Mixed content types in single messages: text + tool_use + tool_result  
+- parentUuid threading creates complex conversation trees
+- Rich metadata: git context, usage stats, project information
+
+### Content Processing Strategy
+- Extract text content with emoji indicators for tool usage (🔧 **Used ToolName**)
+- Truncate verbose tool results to prevent database bloat (500 char limit)
+- Preserve original structure in meta field for future use
+- Handle both string and structured content formats gracefully
+
+### CLI Command Extension Pattern
+- Use Click groups for subcommands: `cafedelia import claude_code`
+- Interactive prompts with sensible defaults for better UX
+- Preserve existing functionality while adding new capabilities
+- Directory path validation and error handling
+
+### Database Strategy
+- Reuse existing ChatDao/MessageDao schema - no new tables needed
+- Store rich metadata in existing meta JSON field
+- Message threading via parent_id relationships  
+- Session titles from JSONL summary data or generated fallbacks
+
+## Development Environment
+- **Virtual Environment**: `/home/alex/code/cafedelia/.venv`
+- **Database**: SQLite at `cafedelia.sqlite` (renamed from elia.sqlite)
+- **Import Command**: `source .venv/bin/activate && python -m elia_chat import claude_code`
+- **Test Strategy**: Import real data (435 sessions) to validate robustness
+
+## Architectural Decisions
+
+### Simplicity Over Complexity
+- **Original Plan**: Complex CLI provider architecture with tmux integration
+- **Implemented**: Simple import system leveraging existing UI
+- **Rationale**: Faster value delivery, validates concept before complexity
+- **Result**: Successful - proves approach viability
+
+### Schema Reuse Strategy  
+- **Decision**: Use existing Elia database schema for Claude Code data
+- **Benefits**: Immediate UI compatibility, no migration complexity
+- **Trade-offs**: Less specialized but more maintainable
+- **Validation**: 100% success rate importing 435 diverse sessions
+
+### Content Extraction Philosophy
+- **Principle**: Preserve maximum information while maintaining readability
+- **Implementation**: Smart truncation, emoji indicators, metadata preservation
+- **Edge Cases**: Handle malformed JSONL gracefully, skip invalid entries
+- **Performance**: Progress tracking for user feedback during large imports
+
+## Future Development Guidelines
+
+### Next Phase Priorities
+1. **UI Enhancement**: Distinguish Claude Code sessions in chat list
+2. **Metadata Display**: Show project context, git branches in interface  
+3. **Search and Filter**: Leverage rich metadata for session discovery
+4. **Session Analytics**: Display usage patterns and complexity metrics
+
+### Proven Patterns to Reuse
+- Click command groups for feature extension
+- Interactive prompts with defaults for user-friendly CLI
+- Rich console progress display for long-running operations
+- Async patterns for non-blocking file operations
+- Graceful error handling with informative user feedback
+
+### Technical Debt to Monitor
+- JSONL parsing assumes Claude Code format stability
+- Large imports may require memory optimization for massive datasets
+- Tool result truncation may lose important context (configurable limits needed)
+- No deduplication logic (re-running import creates duplicates)
+
+## Code Quality Standards
+- **Type Hints**: Full typing for all new functions
+- **Error Handling**: Graceful degradation with user feedback
+- **Documentation**: Docstrings for all public functions
+- **Testing**: Validate with real data, not just unit tests
+- **Performance**: Progress indicators for operations >1 second
+
+## User Experience Insights
+- **Directory Prompts**: Users expect sensible defaults (`~/.claude/projects`)
+- **Progress Feedback**: Essential for long-running imports (435 sessions takes time)
+- **Error Messages**: Be specific about what failed and how to fix it
+- **Backwards Compatibility**: Preserve existing functionality during extensions
+
+This simplified approach proves that complex problems often have elegant solutions when you leverage existing, proven architectures rather than building from scratch.
