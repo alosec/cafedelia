@@ -1,0 +1,59 @@
+services:
+  cafed:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cafedelia-backend
+    ports:
+      - "8001:8001"
+    environment:
+      - NODE_ENV=production
+      - CAFED_PORT=8001
+    volumes:
+      # Mount Claude Code projects directory for session discovery
+      - ${HOME}/.claude/projects:/home/cafed/.claude/projects:ro
+      # Optional: Mount logs directory for persistence
+      - ./logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:8001/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - cafedelia
+
+  # Development override service (use with docker-compose -f docker-compose.yml -f docker-compose.dev.yml)
+  cafed-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    container_name: cafedelia-dev
+    ports:
+      - "8001:8001"
+    environment:
+      - NODE_ENV=development
+      - CAFED_PORT=8001
+    volumes:
+      # Mount source code for hot reload
+      - ./cafed:/app:cached
+      # Mount Claude Code projects directory
+      - ${HOME}/.claude/projects:/home/cafed/.claude/projects:ro
+      # Mount node_modules as named volume for performance
+      - cafed_node_modules:/app/node_modules
+    command: ["dumb-init", "--", "npm", "run", "dev"]
+    restart: unless-stopped
+    profiles:
+      - dev
+    networks:
+      - cafedelia
+
+volumes:
+  cafed_node_modules:
+    driver: local
+
+networks:
+  cafedelia:
+    driver: bridge
