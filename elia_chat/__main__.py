@@ -16,6 +16,7 @@ from rich.console import Console
 from elia_chat.app import Elia
 from elia_chat.config import LaunchConfig
 from elia_chat.database.import_chatgpt import import_chatgpt_data
+from elia_chat.database.import_claude_code_jsonl import import_all_claude_code_sessions
 from elia_chat.database.database import create_database, sqlite_file_name
 from elia_chat.locations import config_file
 
@@ -104,14 +105,19 @@ You may wish to create a backup of \
         asyncio.run(create_database())
         console.print(f"♻️  Database reset @ {sqlite_file_name}")
 
-@cli.command("import")
+@cli.group("import")
+def import_group() -> None:
+    """Import conversations from various sources"""
+    pass
+
+@import_group.command("chatgpt")
 @click.argument(
     "file",
     type=click.Path(
         exists=True, dir_okay=False, path_type=pathlib.Path, resolve_path=True
     ),
 )
-def import_file_to_db(file: pathlib.Path) -> None:
+def import_chatgpt(file: pathlib.Path) -> None:
     """
     Import ChatGPT Conversations
 
@@ -120,6 +126,37 @@ def import_file_to_db(file: pathlib.Path) -> None:
     """
     asyncio.run(import_chatgpt_data(file=file))
     console.print(f"[green]ChatGPT data imported from {str(file)!r}")
+
+@import_group.command("claude_code")
+@click.option(
+    "--directory",
+    "-d",
+    type=click.Path(exists=True, file_okay=False, path_type=pathlib.Path),
+    help="Directory containing Claude Code JSONL session files"
+)
+def import_claude_code(directory: pathlib.Path | None) -> None:
+    """
+    Import Claude Code Sessions
+
+    This command will import Claude Code sessions from JSONL files
+    found in the specified directory or ~/.claude/projects by default.
+    """
+    if not directory:
+        default_dir = pathlib.Path.home() / ".claude" / "projects"
+        directory_str = click.prompt(
+            "Enter Claude Code projects directory",
+            default=str(default_dir),
+            type=str
+        )
+        directory = pathlib.Path(directory_str)
+    
+    if not directory.exists():
+        console.print(f"[red]Directory does not exist: {directory}")
+        return
+    
+    console.print(f"[blue]Importing Claude Code sessions from: {directory}")
+    asyncio.run(import_all_claude_code_sessions(directory))
+    console.print(f"[green]Claude Code sessions imported from {str(directory)!r}")
 
 if __name__ == "__main__":
     cli()
