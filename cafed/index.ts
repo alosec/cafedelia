@@ -2,6 +2,13 @@ import express from 'express';
 import cors from 'cors';
 import { createLogger, format, transports } from 'winston';
 import { getClaudeDiscovery } from './services/claude-discovery.js';
+import { getClaudeCodeService } from './services/claude-code-service.js';
+import { getProjectService } from './services/project-service.js';
+import { getSessionService } from './services/session-service.js';
+import { getSQLiteService } from './services/sqlite-service.js';
+import { runPipeline } from './core/runner.js';
+import { fileToEmacs, claudeCodeToEmacs } from './pipelines/index.js';
+import { logger as structuredLogger } from './utils/logger.js';
 
 // Initialize logger
 const logger = createLogger({
@@ -62,6 +69,7 @@ app.get('/api/sessions', async (req, res) => {
       session_uuid: session.sessionUuid,
       project_name: session.projectName,
       project_path: session.projectPath,
+      title: session.title,
       status: session.isActive ? 'active' : 'inactive',
       created_at: session.createdAt.toISOString(),
       last_activity: session.lastActivity.toISOString(),
@@ -131,6 +139,7 @@ app.get('/api/sessions/:sessionId', async (req, res) => {
         session_uuid: session.sessionUuid,
         project_name: session.projectName,
         project_path: session.projectPath,
+        title: session.title,
         status: session.isActive ? 'active' : 'inactive',
         created_at: session.createdAt.toISOString(),
         last_activity: session.lastActivity.toISOString(),
@@ -189,8 +198,50 @@ app.use('*', (req, res) => {
   });
 });
 
+// Initialize services
+async function initializeServices() {
+  try {
+    // Initialize SQLite database
+    const sqliteService = getSQLiteService();
+    if (!(await sqliteService.isInitialized())) {
+      logger.info('Initializing SQLite database schema...');
+      await sqliteService.initializeSchema();
+      logger.info('SQLite database initialized');
+    }
+    
+    // Test service connections
+    const claudeCodeService = getClaudeCodeService();
+    const summary = await claudeCodeService.getSessionSummary();
+    logger.info('Service initialization complete', { summary });
+    
+    return true;
+  } catch (error) {
+    logger.error('Service initialization failed:', error);
+    return false;
+  }
+}
+
+// Start WTE pipelines
+async function startPipelines() {
+  logger.info('Starting WTE pipelines...');
+  
+  // Start pipelines in parallel
+  Promise.all([
+    runPipeline(fileToEmacs).catch(err => {
+      logger.error('MCP Pipeline Error:', err);
+    }),
+    runPipeline(claudeCodeToEmacs).catch(err => {
+      logger.error('Claude Code Pipeline Error:', err);
+    })
+  ]).catch(err => {
+    logger.error('Pipeline startup error:', err);
+  });
+  
+  logger.info('WTE pipelines started');
+}
+
 // Start server
-app.listen(port, () => {
+app.listen(port, async () => {
   logger.info(`Cafed backend server running on http://localhost:${port}`);
   logger.info('Available endpoints:');
   logger.info('  GET /health - Health check');
@@ -198,6 +249,16 @@ app.listen(port, () => {
   logger.info('  GET /api/sessions/:id - Get specific session');
   logger.info('  GET /api/projects - List all projects');
   logger.info('  GET /api/summary - Session summary statistics');
+  
+  // Initialize services
+  const servicesReady = await initializeServices();
+  if (servicesReady) {
+    // Start WTE pipelines
+    await startPipelines();
+    logger.info('Cafed fully initialized and ready');
+  } else {
+    logger.warn('Service initialization failed - running in degraded mode');
+  }
 });
 
 // Graceful shutdown
