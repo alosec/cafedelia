@@ -95,20 +95,23 @@ class Elia(App[None]):
                 self.cafed_enabled = False
                 return False
             
-            # Start cafed backend
+            # Start cafed backend with Docker
             self.cafed_process = subprocess.Popen(
-                [str(cafed_script)],
+                [str(cafed_script), "production"],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 cwd=project_root
             )
             
-            # Give it a moment to start
-            await asyncio.sleep(2)
+            # Give Docker containers more time to start
+            await asyncio.sleep(8)
             
             # Check if process is still running
             if self.cafed_process.poll() is not None:
-                self.notify("Failed to start cafed backend", severity="error")
+                # Try to get error output
+                stdout, stderr = self.cafed_process.communicate()
+                error_msg = stderr.decode() if stderr else "Unknown error"
+                self.notify(f"Failed to start cafed backend: {error_msg}", severity="error")
                 return False
             
             # Try to sync sessions
@@ -132,21 +135,35 @@ class Elia(App[None]):
 
     async def stop_cafed_backend(self) -> None:
         """Stop the cafed backend server"""
-        if self.cafed_process and self.cafed_process.poll() is None:
-            try:
-                self.cafed_process.terminate()
-                # Give it 5 seconds to terminate gracefully
+        try:
+            # Use Docker compose to stop containers properly
+            project_root = Path(__file__).parent.parent
+            stop_result = subprocess.run(
+                ["docker", "compose", "down"],
+                cwd=project_root,
+                capture_output=True,
+                text=True
+            )
+            
+            if stop_result.returncode != 0:
+                self.notify(f"Warning: Docker stop had issues: {stop_result.stderr}", severity="warning")
+            
+            # Also terminate the script process if still running
+            if self.cafed_process and self.cafed_process.poll() is None:
                 try:
+                    self.cafed_process.terminate()
                     await asyncio.wait_for(
                         asyncio.to_thread(self.cafed_process.wait), 
-                        timeout=5.0
+                        timeout=3.0
                     )
                 except asyncio.TimeoutError:
-                    # Force kill if it doesn't terminate gracefully
                     self.cafed_process.kill()
                     await asyncio.to_thread(self.cafed_process.wait)
-            except Exception as e:
-                self.notify(f"Error stopping cafed backend: {e}", severity="warning")
+                except Exception as e:
+                    self.notify(f"Error stopping script process: {e}", severity="warning")
+                    
+        except Exception as e:
+            self.notify(f"Error stopping cafed backend: {e}", severity="warning")
         
         # Close bridge connections
         await close_global_sync()

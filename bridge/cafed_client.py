@@ -4,6 +4,7 @@ Python HTTP client for communicating with cafed backend
 
 import asyncio
 import json
+import os
 from datetime import datetime
 from typing import Dict, List, Optional, Any
 import httpx
@@ -44,10 +45,30 @@ class SessionSummary:
 class CafedClient:
     """HTTP client for cafed backend API"""
     
-    def __init__(self, base_url: str = "http://localhost:8001", timeout: float = 30.0):
+    def __init__(self, base_url: Optional[str] = None, timeout: float = 30.0):
+        # Auto-detect backend URL based on environment
+        if base_url is None:
+            base_url = self._detect_backend_url()
+        
         self.base_url = base_url.rstrip('/')
         self.timeout = timeout
         self._client: Optional[httpx.AsyncClient] = None
+    
+    def _detect_backend_url(self) -> str:
+        """Detect backend URL based on environment"""
+        # Check environment variable first
+        env_url = os.getenv('CAFED_BACKEND_URL')
+        if env_url:
+            return env_url
+        
+        # Check if running in Docker container
+        if os.path.exists('/.dockerenv'):
+            # Inside container, use container name
+            return "http://cafedelia-backend:8001"
+        
+        # Default to localhost
+        port = os.getenv('CAFED_PORT', '8001')
+        return f"http://localhost:{port}"
     
     async def _get_client(self) -> httpx.AsyncClient:
         """Get or create HTTP client"""
