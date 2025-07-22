@@ -133,11 +133,44 @@ class HomeScreen(Screen[None]):
             await self.app.launch_session(session_id, selected_model)
 ```
 
-### Claude Code Integration Patterns - Implemented Approach
+### Claude Code Integration Patterns - Modularized Architecture
 
-#### JSONL Import Pattern (Implemented)
+#### Import System Architecture (Modularized)
+```
+elia_chat/database/importers/
+├── __init__.py - Unified import module exports
+├── claude_code/
+│   ├── __init__.py - ClaudeCodeImporter orchestrator with public API
+│   └── services/
+│       ├── jsonl_reader.py - File parsing and metadata extraction
+│       ├── message_transformer.py - Content normalization
+│       ├── database_writer.py - Async database operations
+│       ├── file_scanner.py - Session discovery
+│       └── progress_tracker.py - User feedback
+└── chatgpt/
+    ├── __init__.py - ChatGPT import module exports
+    └── importer.py - ChatGPT import logic
+```
+
+#### Modular Import Pattern (Current Implementation)
 ```python
-# elia_chat/database/import_claude_code_jsonl.py
+# elia_chat/database/importers/claude_code/__init__.py
+class ClaudeCodeImporter:
+    """Main orchestrator for Claude Code session imports"""
+    
+    def __init__(self, projects_dir: Path | None = None):
+        self.file_scanner = FileScanner(projects_dir)
+        self.progress_tracker = ProgressTracker()
+        
+    async def import_single_session(self, file: Path) -> None:
+        # Initialize services
+        reader = JsonlReader(file)
+        transformer = MessageTransformer()
+        db_writer = DatabaseWriter()
+        
+        # Orchestrate import process with progress tracking
+        
+# Backward-compatible public API
 async def import_all_claude_code_sessions(projects_dir: Path | None = None) -> None:
     """Import all Claude Code JSONL session files into existing Elia database"""
     session_files = await discover_claude_sessions(projects_dir)
@@ -224,14 +257,41 @@ def import_claude_code(directory: pathlib.Path | None) -> None:
     asyncio.run(import_all_claude_code_sessions(directory))
 ```
 
-#### Key Implementation Insights
-**Claude Code JSONL Quirks Successfully Handled**:
-1. **Tool Result Messages**: "user" type messages often contain tool execution results
-2. **Mixed Content Types**: Same message can have text + tool_use + tool_result content
-3. **Threading Complexity**: parentUuid relationships create complex conversation trees
-4. **Metadata Richness**: Sessions contain git context, usage stats, project information
+#### Service Responsibilities and Patterns
 
-**Validation**: 435 sessions (massive dataset) imported successfully with 100% data preservation
+**JsonlReader Service**:
+- File reading and JSONL parsing with error handling
+- Session metadata extraction from file headers
+- Line-by-line processing with validation
+
+**MessageTransformer Service**:
+- Content extraction from Claude Code's mixed formats
+- Tool use pattern normalization with emoji indicators  
+- ISO timestamp parsing and datetime conversion
+
+**DatabaseWriter Service**:
+- Async database operations with session management
+- Message threading via parentUuid resolution
+- Chat and message creation with metadata preservation
+
+**FileScanner Service**:
+- Session file discovery from ~/.claude/projects/
+- File validation and sorting by modification time
+- Directory management and path resolution
+
+**ProgressTracker Service**:
+- Rich console progress display with live updates
+- User feedback for import status and errors
+- Session-level and file-level progress tracking
+
+#### Key Implementation Insights
+**Modular Benefits Achieved**:
+1. **Single Responsibility**: Each service handles one concern
+2. **Testability**: Services can be mocked and tested independently
+3. **Reusability**: Components can be used in different import contexts
+4. **Maintainability**: Clear boundaries and focused interfaces
+
+**Architecture Validation**: 435 sessions imported successfully with modular approach
 
 #### Tmux Integration Pattern (Future)
 ```python

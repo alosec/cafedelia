@@ -15,8 +15,8 @@ from rich.console import Console
 
 from elia_chat.app import Elia
 from elia_chat.config import LaunchConfig
-from elia_chat.database.import_chatgpt import import_chatgpt_data
-from elia_chat.importers.claude_code import import_all_claude_code_sessions
+from elia_chat.database.importers.chatgpt import import_chatgpt_data
+from elia_chat.database.importers.claude_code import import_all_claude_code_sessions
 from elia_chat.database.database import create_database, sqlite_file_name
 from elia_chat.locations import config_file
 

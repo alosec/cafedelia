@@ -7,13 +7,25 @@
 
 ## Key Implementation Patterns
 
+### Modular Import Architecture (Current)
+- **Services Pattern**: Five focused services with single responsibilities
+  - `JsonlReader`: File parsing and metadata extraction
+  - `MessageTransformer`: Content normalization and format handling
+  - `DatabaseWriter`: Async operations and session management
+  - `FileScanner`: Session discovery and file validation
+  - `ProgressTracker`: User feedback and progress display
+- **Index/Orchestrator Pattern**: `ClaudeCodeImporter` coordinates service interactions
+- **Backward Compatibility**: Public API preserved during modularization
+- **Professional Organization**: Clean structure under `database/importers/`
+
 ### Claude Code JSONL Format Quirks
 - "user" type messages often contain tool execution results (weird but patterned)
 - Mixed content types in single messages: text + tool_use + tool_result  
 - parentUuid threading creates complex conversation trees
 - Rich metadata: git context, usage stats, project information
 
-### Content Processing Strategy
+### Content Processing Strategy (Modularized)
+- **MessageTransformer Service**: Handles all content extraction logic
 - Extract text content with emoji indicators for tool usage (🔧 **Used ToolName**)
 - Truncate verbose tool results to prevent database bloat (500 char limit)
 - Preserve original structure in meta field for future use
@@ -25,7 +37,8 @@
 - Preserve existing functionality while adding new capabilities
 - Directory path validation and error handling
 
-### Database Strategy
+### Database Strategy (Service-Oriented)
+- **DatabaseWriter Service**: Handles all database operations
 - Reuse existing ChatDao/MessageDao schema - no new tables needed
 - Store rich metadata in existing meta JSON field
 - Message threading via parent_id relationships  
@@ -59,13 +72,16 @@
 
 ## Future Development Guidelines
 
-### Next Phase Priorities
-1. **UI Enhancement**: Distinguish Claude Code sessions in chat list
-2. **Metadata Display**: Show project context, git branches in interface  
-3. **Search and Filter**: Leverage rich metadata for session discovery
-4. **Session Analytics**: Display usage patterns and complexity metrics
+### Next Phase Priorities (Post-Modularization)
+1. **Testing Infrastructure**: Comprehensive test suite for each service
+2. **Service Enhancement**: Add caching, validation, and error recovery
+3. **Additional Import Sources**: Leverage modular pattern for new providers
+4. **Documentation**: API documentation for import service architecture
 
 ### Proven Patterns to Reuse
+- **Modular Services Pattern**: Single responsibility services with clear interfaces
+- **Index/Orchestrator Pattern**: Coordinate complex workflows with service composition
+- **Backward Compatible APIs**: Preserve existing interfaces during refactoring
 - Click command groups for feature extension
 - Interactive prompts with defaults for user-friendly CLI
 - Rich console progress display for long-running operations
@@ -73,10 +89,11 @@
 - Graceful error handling with informative user feedback
 
 ### Technical Debt to Monitor
-- JSONL parsing assumes Claude Code format stability
-- Large imports may require memory optimization for massive datasets
-- Tool result truncation may lose important context (configurable limits needed)
-- No deduplication logic (re-running import creates duplicates)
+- **Service Testing**: Need comprehensive test coverage for each service
+- **Error Recovery**: Services need enhanced error handling and retry logic
+- **Performance**: Large imports may require memory optimization for massive datasets
+- **Deduplication**: No logic to prevent duplicate imports (configurable needed)
+- **Configuration**: Services should accept configuration for customizable behavior
 
 ## Code Quality Standards
 - **Type Hints**: Full typing for all new functions
