@@ -119,7 +119,15 @@ class Elia(App[None]):
                 session_sync = get_session_sync()
                 health = await session_sync.health_check()
                 if health.get('overall_status') == 'ok':
-                    self.notify("Cafed backend started successfully", severity="information")
+                    # Sync live sessions into chat database
+                    sync_results = await session_sync.sync_all_sessions()
+                    created_count = sync_results.get('created', 0)
+                    updated_count = sync_results.get('updated', 0)
+                    
+                    if created_count > 0 or updated_count > 0:
+                        self.notify(f"Synced {created_count} new, {updated_count} updated Claude sessions", severity="information")
+                    else:
+                        self.notify("Cafed backend started successfully", severity="information")
                     return True
                 else:
                     self.notify("Cafed backend started but health check failed", severity="warning")
