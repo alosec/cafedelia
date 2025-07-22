@@ -16,6 +16,7 @@ export interface ClaudeSession {
   sessionUuid: string;
   projectPath: string;
   projectName: string;
+  title: string;
   createdAt: Date;
   lastActivity: Date;
   conversationTurns: number;
@@ -192,6 +193,7 @@ export class ClaudeDiscovery {
       const fileOperations: string[] = [];
       let createdAt: Date | null = null;
       let lastActivity: Date | null = null;
+      let sessionTitle: string | null = null;
 
       const content = await readFile(sessionFilePath, 'utf-8');
       const lines = content.split('\n');
@@ -205,6 +207,11 @@ export class ClaudeDiscovery {
         try {
           const entry = JSON.parse(trimmedLine);
           conversationTurns++;
+
+          // Extract title from summary entry
+          if (entry.type === "summary" && entry.summary && !sessionTitle) {
+            sessionTitle = entry.summary;
+          }
 
           // Extract timestamp
           if (entry.timestamp) {
@@ -253,6 +260,7 @@ export class ClaudeDiscovery {
         sessionUuid,
         projectPath,
         projectName,
+        title: sessionTitle || `Claude Code Session (${sessionUuid.substring(0, 8)})`,
         createdAt,
         lastActivity,
         conversationTurns,
