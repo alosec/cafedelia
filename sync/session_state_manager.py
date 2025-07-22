@@ -183,6 +183,7 @@ class SessionStateManager:
         """
         if session_id not in self.active_sessions:
             logger.error(f"Attempted to process message for unregistered session: {session_id}")
+            logger.error(f"Active sessions: {list(self.active_sessions.keys())}")
             return None
         
         session_state = self.active_sessions[session_id]

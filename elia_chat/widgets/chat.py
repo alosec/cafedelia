@@ -444,6 +444,7 @@ class Chat(Widget):
             should_resume = session_id != "new" and session_id != str(self.chat_data.id)
             
             log.debug(f"Starting intelligent Claude Code stream for session: {session_id} (resume: {should_resume})")
+            log.debug(f"Chat data: id={self.chat_data.id}, title={self.chat_data.title}, session_id={getattr(self.chat_data, 'session_id', 'None')}")
             
             # Get the last user message
             user_message = self.chat_data.messages[-1].message.get("content", "")
@@ -464,6 +465,8 @@ class Chat(Widget):
                 model=model_choice
             )
             
+            log.debug(f"Got actual session ID: {actual_session_id} (requested: {session_id})")
+            
             # Emit session ID for log viewer
             if actual_session_id:
                 self.post_message(self.SessionIdCaptured(actual_session_id))
@@ -478,8 +481,10 @@ class Chat(Widget):
             # Register state management event handlers  
             def on_ui_update_required(event):
                 """Handle UI update events - create and mount individual Chatbox widgets."""
+                log.debug(f"UI update event received: {event.event_type}, action: {event.data.get('action')}")
                 if event.data.get('action') == 'add_message':
                     message_dao = event.data['message_dao']
+                    log.debug(f"Processing message {message_dao.id} for UI display")
                     try:
                         # Convert to ChatMessage format using existing converter
                         from elia_chat.database.converters import message_dao_to_chat_message
@@ -489,12 +494,20 @@ class Chat(Widget):
                         model = get_model(message_dao.model or "claude-code")
                         chat_message = message_dao_to_chat_message(message_dao, model.lookup_key)
                         
-                        # Create Chatbox using the battle-tested pattern
-                        chatbox = Chatbox(
-                            message=chat_message,
-                            model=model,
-                            classes=self._get_message_classes(message_dao)
-                        )
+                        # Try to use specialized widget for tool messages
+                        from elia_chat.widgets.message_types import create_message_widget
+                        widget = create_message_widget(chat_message, model)
+                        
+                        if widget:
+                            # Use specialized widget (green boxes for tools, etc.)
+                            chatbox = widget
+                        else:
+                            # Fallback to standard Chatbox
+                            chatbox = Chatbox(
+                                message=chat_message,
+                                model=model,
+                                classes=self._get_message_classes(message_dao)
+                            )
                         
                         # Mount the chatbox using the proven pattern
                         self.app.call_from_thread(self.chat_container.mount, chatbox)

@@ -265,12 +265,35 @@ class Chatbox(Widget, can_focus=True):
     def on_mount(self) -> None:
         litellm_message = self.message.message
         role = litellm_message["role"]
+        
+        # Build title with metadata
+        base_title = "Agent" if role == "assistant" else "You"
+        
+        # Add timestamp if available
+        if hasattr(self.message, 'timestamp') and self.message.timestamp:
+            time_str = self.message.timestamp.strftime("%H:%M:%S")
+            base_title = f"{base_title} • {time_str}"
+        
+        # Add message ID if available (for debugging)
+        if hasattr(self.message, 'id') and self.message.id:
+            base_title = f"{base_title} • #{self.message.id}"
+        
+        # Add sync status if available
+        if hasattr(self.message, 'sync_status'):
+            status_icon = {
+                'synced': '✓',
+                'syncing': '⟳',
+                'error': '✗'
+            }.get(self.message.sync_status, '')
+            if status_icon:
+                base_title = f"{base_title} {status_icon}"
+        
+        self.border_title = base_title
+        
         if role == "assistant":
             self.add_class("assistant-message")
-            self.border_title = "Agent"
         else:
             self.add_class("human-message")
-            self.border_title = "You"
 
     def action_up(self) -> None:
         self.screen.focus_previous(Chatbox)

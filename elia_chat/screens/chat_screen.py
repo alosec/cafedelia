@@ -10,6 +10,7 @@ from elia_chat.widgets.agent_is_typing import ResponseStatus
 from elia_chat.widgets.chat import Chat
 from elia_chat.widgets.chat_header import ChatHeader
 from elia_chat.widgets.session_log_viewer import SessionLogViewer
+from elia_chat.widgets.system_status_panel import SystemStatusPanel
 from elia_chat.models import ChatData
 
 
@@ -29,6 +30,13 @@ class ChatScreen(Screen[None]):
             description="Toggle logs",
             key_display="F3",
             tooltip="Show/hide session logs panel.",
+        ),
+        Binding(
+            key="f4",
+            action="toggle_status",
+            description="System status",
+            key_display="F4",
+            tooltip="Show/hide system status panel.",
         ),
     ]
 
@@ -57,6 +65,12 @@ class ChatScreen(Screen[None]):
             chat = Chat(self.chat_data)
             chat.id = "main-chat"
             yield chat
+        
+        # Add system status panel (hidden by default)
+        status_panel = SystemStatusPanel()
+        status_panel.id = "system-status"
+        yield status_panel
+        
         yield Footer()
 
     @on(Chat.NewUserMessage)
@@ -86,9 +100,22 @@ class ChatScreen(Screen[None]):
         if self.chat_data.id is None:
             raise RuntimeError("Chat has no ID. This is likely a bug in Elia.")
 
-        await self.chats_manager.add_message_to_chat(
-            chat_id=self.chat_data.id, message=event.message
+        # Skip database persistence for Claude Code sessions
+        # They handle their own persistence through session_state_manager
+        is_claude_code = (
+            hasattr(self.chat_data.model, 'provider') and 
+            self.chat_data.model.provider == "Claude Code"
         )
+        
+        if not is_claude_code:
+            await self.chats_manager.add_message_to_chat(
+                chat_id=self.chat_data.id, message=event.message
+            )
+        else:
+            log.debug(
+                f"Skipping database persistence for Claude Code session {self.chat_data.id} "
+                f"(handled by session_state_manager)"
+            )
     
     def _should_show_logs_by_default(self) -> bool:
         """Determine if logs should be shown by default for this chat."""
@@ -104,6 +131,14 @@ class ChatScreen(Screen[None]):
         # If we're showing logs and have a session ID, start tailing
         if self._log_viewer_visible:
             self._update_log_viewer_session()
+    
+    def action_toggle_status(self) -> None:
+        """Toggle the system status panel."""
+        try:
+            status_panel = self.query_one("#system-status", SystemStatusPanel)
+            status_panel.toggle_visibility()
+        except Exception as e:
+            log.warning(f"Could not toggle status panel: {e}")
     
     def _update_log_viewer_session(self) -> None:
         """Update the log viewer with the current session ID."""

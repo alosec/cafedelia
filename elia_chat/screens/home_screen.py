@@ -15,6 +15,7 @@ from elia_chat.widgets.app_header import AppHeader
 from elia_chat.screens.chat_screen import ChatScreen
 from elia_chat.widgets.chat_options import OptionsModal
 from elia_chat.widgets.welcome import Welcome
+from elia_chat.widgets.database_integrity_widget import DatabaseIntegrityWidget, DatabaseRepairComplete
 
 if TYPE_CHECKING:
     from elia_chat.app import Elia
@@ -63,14 +64,21 @@ ChatList {
         super().__init__(name, id, classes)
         self.config_signal = config_signal
         self.elia = cast("Elia", self.app)
+        self.integrity_report = None
 
     def on_mount(self) -> None:
         self.chats_manager = ChatsManager()
+        self._check_database_integrity()
 
     def compose(self) -> ComposeResult:
         yield AppHeader(self.config_signal)
         yield HomePromptInput(id="home-prompt")
         yield ChatList()
+        
+        # Always show integrity widget for testing
+        if self.integrity_report:
+            yield DatabaseIntegrityWidget(self.integrity_report)
+        
         yield Welcome()
         yield Footer()
 
@@ -125,3 +133,41 @@ ChatList {
         else:
             welcome = self.query_one(Welcome)
             welcome.display = "none"
+    
+    def _check_database_integrity(self) -> None:
+        """Check database integrity in the background."""
+        from textual import log
+        import asyncio
+        
+        async def check_integrity():
+            try:
+                from sync.database_integrity import DatabaseIntegrityChecker
+                checker = DatabaseIntegrityChecker()
+                report = await checker.check_integrity()
+                
+                # Convert report to expected format
+                self.integrity_report = {
+                    'stats': report['stats'],
+                    'invalid_chats': report['invalid_chats'],
+                    'orphaned_chats': report['orphaned_chats'],
+                    'is_clean': (report['stats']['invalid_chats'] == 0 and 
+                               report['stats']['orphaned_chats'] == 0)
+                }
+                
+                # Trigger recompose to show integrity widget
+                self.refresh(recompose=True)
+                
+            except Exception as e:
+                log.error(f"Database integrity check failed: {e}")
+        
+        # Run in background
+        asyncio.create_task(check_integrity())
+    
+    @on(DatabaseRepairComplete)
+    async def handle_repair_complete(self, event: DatabaseRepairComplete) -> None:
+        """Handle database repair completion."""
+        # Reload chat list to show cleaned data
+        await self.reload_screen()
+        
+        # Re-run integrity check
+        self._check_database_integrity()
