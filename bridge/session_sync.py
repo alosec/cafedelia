@@ -44,13 +44,13 @@ class SessionSync:
                         if existing_chat:
                             # Update existing chat title and model if needed
                             if not existing_chat.title or existing_chat.title.startswith("Claude Code Session ("):
-                                existing_chat.title = f"🔴 {session.project_name} ({session.status})"
+                                existing_chat.title = session.title
                             db_session.add(existing_chat)
                             results['updated'] += 1
                         else:
                             # Create new chat for this live session
                             new_chat = ChatDao(
-                                title=f"🔴 {session.project_name} ({session.status})",
+                                title=session.title,
                                 model="claude-sonnet-4-live",
                                 started_at=session.created_at
                             )
@@ -116,12 +116,12 @@ class SessionSync:
                 
                 if existing_chat:
                     # Update existing chat title to reflect current status
-                    existing_chat.title = f"🔴 {session.project_name} ({session.status})"
+                    existing_chat.title = session.title
                     db_session.add(existing_chat)
                 else:
                     # Create new chat for this live session
                     new_chat = ChatDao(
-                        title=f"🔴 {session.project_name} ({session.status})",
+                        title=session.title,
                         model="claude-sonnet-4-live",
                         started_at=session.created_at
                     )

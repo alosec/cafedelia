@@ -4,7 +4,7 @@ import asyncio
 import datetime
 import subprocess
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from textual.app import App
 from textual.binding import Binding
@@ -37,7 +37,6 @@ class Elia(App[None]):
     ]
 
     def __init__(self, config: LaunchConfig, startup_prompt: str = ""):
-        self.cafed_process: Optional[subprocess.Popen] = None
         self.cafed_enabled = True  # TODO: Make this configurable
         self.launch_config = config
 
@@ -77,14 +76,29 @@ class Elia(App[None]):
         self.runtime_config_signal.publish(self.runtime_config)
 
     async def start_cafed_backend(self) -> bool:
-        """Start the cafed backend server"""
+        """Start the cafed backend server or connect to existing one"""
         if not self.cafed_enabled:
             return True
             
         try:
-            # Check if cafed is already running
-            if self.cafed_process and self.cafed_process.poll() is None:
-                return True
+            # First check if backend is already running by testing the health endpoint
+            session_sync = get_session_sync()
+            try:
+                health = await session_sync.health_check()
+                if health.get('overall_status') == 'ok':
+                    # Backend is already running, sync sessions
+                    sync_results = await session_sync.sync_all_sessions()
+                    created_count = sync_results.get('created', 0)
+                    updated_count = sync_results.get('updated', 0)
+                    
+                    if created_count > 0 or updated_count > 0:
+                        self.notify(f"Connected to backend - synced {created_count} new, {updated_count} updated Claude sessions", severity="information")
+                    else:
+                        self.notify("Connected to cafed backend successfully", severity="information")
+                    return True
+            except:
+                # Backend not running, try to start it
+                pass
             
             # Get the project root directory
             project_root = Path(__file__).parent.parent
@@ -96,27 +110,23 @@ class Elia(App[None]):
                 return False
             
             # Start cafed backend with Docker
-            self.cafed_process = subprocess.Popen(
+            start_result = subprocess.run(
                 [str(cafed_script), "production"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                capture_output=True,
+                text=True,
                 cwd=project_root
             )
             
-            # Give Docker containers more time to start
-            await asyncio.sleep(8)
-            
-            # Check if process is still running
-            if self.cafed_process.poll() is not None:
-                # Try to get error output
-                stdout, stderr = self.cafed_process.communicate()
-                error_msg = stderr.decode() if stderr else "Unknown error"
-                self.notify(f"Failed to start cafed backend: {error_msg}", severity="error")
+            # The script returns 0 whether it starts a new container or finds one already running
+            if start_result.returncode != 0:
+                self.notify(f"Failed to start cafed backend: {start_result.stderr}", severity="error")
                 return False
             
-            # Try to sync sessions
+            # Give Docker containers time to be ready
+            await asyncio.sleep(3)
+            
+            # Try to connect and sync sessions
             try:
-                session_sync = get_session_sync()
                 health = await session_sync.health_check()
                 if health.get('overall_status') == 'ok':
                     # Sync live sessions into chat database
@@ -125,7 +135,7 @@ class Elia(App[None]):
                     updated_count = sync_results.get('updated', 0)
                     
                     if created_count > 0 or updated_count > 0:
-                        self.notify(f"Synced {created_count} new, {updated_count} updated Claude sessions", severity="information")
+                        self.notify(f"Backend started - synced {created_count} new, {updated_count} updated Claude sessions", severity="information")
                     else:
                         self.notify("Cafed backend started successfully", severity="information")
                     return True
@@ -144,6 +154,11 @@ class Elia(App[None]):
     async def stop_cafed_backend(self) -> None:
         """Stop the cafed backend server"""
         try:
+            # Only stop containers if we're enabled - don't interfere with external Docker management
+            if not self.cafed_enabled:
+                await close_global_sync()
+                return
+                
             # Use Docker compose to stop containers properly
             project_root = Path(__file__).parent.parent
             stop_result = subprocess.run(
@@ -155,20 +170,6 @@ class Elia(App[None]):
             
             if stop_result.returncode != 0:
                 self.notify(f"Warning: Docker stop had issues: {stop_result.stderr}", severity="warning")
-            
-            # Also terminate the script process if still running
-            if self.cafed_process and self.cafed_process.poll() is None:
-                try:
-                    self.cafed_process.terminate()
-                    await asyncio.wait_for(
-                        asyncio.to_thread(self.cafed_process.wait), 
-                        timeout=3.0
-                    )
-                except asyncio.TimeoutError:
-                    self.cafed_process.kill()
-                    await asyncio.to_thread(self.cafed_process.wait)
-                except Exception as e:
-                    self.notify(f"Error stopping script process: {e}", severity="warning")
                     
         except Exception as e:
             self.notify(f"Error stopping cafed backend: {e}", severity="warning")
