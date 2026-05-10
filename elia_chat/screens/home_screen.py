@@ -51,6 +51,13 @@ ChatList {
             tooltip="Change the model, system prompt, and check where Elia"
             " is storing your data.",
         ),
+        Binding(
+            "ctrl+g",
+            "group_room",
+            "Group chat",
+            key_display="^g",
+            tooltip="Open the Claude Code × Codex group chat room.",
+        ),
     ]
 
     def __init__(
@@ -87,6 +94,10 @@ ChatList {
         chat = await self.chats_manager.get_chat(chat_id)
         await self.app.push_screen(ChatScreen(chat))
 
+    @on(ChatList.RoomOpened)
+    async def open_room_screen(self, event: ChatList.RoomOpened):
+        await self.elia.launch_room(title=event.room.title)
+
     @on(ChatList.CursorEscapingTop)
     def cursor_escaping_top(self):
         self.query_one(HomePromptInput).focus()
@@ -94,10 +105,7 @@ ChatList {
     @on(PromptInput.PromptSubmitted)
     async def create_new_chat(self, event: PromptInput.PromptSubmitted) -> None:
         text = event.text
-        await self.elia.launch_chat(  # type: ignore
-            prompt=text,
-            model=self.elia.runtime_config.selected_model,
-        )
+        await self.elia.launch_room(prompt=text)
 
     @on(PromptInput.CursorEscapingBottom)
     async def move_focus_below(self) -> None:
@@ -112,6 +120,9 @@ ChatList {
             OptionsModal(),
             callback=self.update_config,
         )
+
+    async def action_group_room(self) -> None:
+        await self.elia.launch_room()
 
     def update_config(self, runtime_config: RuntimeConfig) -> None:
         app = cast("Elia", self.app)

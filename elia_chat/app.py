@@ -13,9 +13,11 @@ from elia_chat.chats_manager import ChatsManager
 from elia_chat.models import ChatData, ChatMessage
 from elia_chat.config import EliaChatModel, LaunchConfig
 from elia_chat.runtime_config import RuntimeConfig
+from elia_chat.rooms.manager import RoomManager
 from elia_chat.screens.chat_screen import ChatScreen
 from elia_chat.screens.help_screen import HelpScreen
 from elia_chat.screens.home_screen import HomeScreen
+from elia_chat.screens.room_screen import RoomScreen
 from elia_chat.themes import BUILTIN_THEMES, Theme, load_user_themes
 
 if TYPE_CHECKING:
@@ -33,7 +35,13 @@ class Elia(App[None]):
         Binding("f1,?", "help", "Help"),
     ]
 
-    def __init__(self, config: LaunchConfig, startup_prompt: str = ""):
+    def __init__(
+        self,
+        config: LaunchConfig,
+        startup_prompt: str = "",
+        startup_room: bool = False,
+        startup_room_title: str = "Claude Code × Codex",
+    ):
         self.launch_config = config
 
         available_themes: dict[str, Theme] = BUILTIN_THEMES.copy()
@@ -57,6 +65,8 @@ class Elia(App[None]):
         This is a convenience which will immediately load the chat interface and
         put users into the chat window, rather than going to the home screen.
         """
+        self.startup_room = startup_room
+        self.startup_room_title = startup_room_title
 
         super().__init__()
 
@@ -74,11 +84,24 @@ class Elia(App[None]):
     async def on_mount(self) -> None:
         await self.push_screen(HomeScreen(self.runtime_config_signal))
         self.theme = self.launch_config.theme
-        if self.startup_prompt:
+        if self.startup_room:
+            await self.launch_room(
+                prompt=self.startup_prompt,
+                title=self.startup_room_title,
+            )
+        elif self.startup_prompt:
             await self.launch_chat(
                 prompt=self.startup_prompt,
                 model=self.runtime_config.selected_model,
             )
+
+    async def launch_room(
+        self, prompt: str = "", title: str = "Claude Code × Codex"
+    ) -> None:
+        room = await RoomManager.get_or_create_room(title)
+        if room.id is None:
+            raise RuntimeError("Room was not assigned an ID.")
+        await self.push_screen(RoomScreen(room.id, room.title, startup_prompt=prompt))
 
     async def launch_chat(self, prompt: str, model: EliaChatModel) -> None:
         current_time = datetime.datetime.now(datetime.timezone.utc)

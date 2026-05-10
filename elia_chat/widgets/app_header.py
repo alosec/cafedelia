@@ -1,6 +1,5 @@
 from typing import TYPE_CHECKING, cast
 from importlib.metadata import version
-from rich.markup import escape
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.signal import Signal
@@ -9,7 +8,6 @@ from textual.widgets import Label
 
 from rich.text import Text
 from elia_chat.config import EliaChatModel
-from elia_chat.models import get_model
 from elia_chat.runtime_config import RuntimeConfig
 
 
@@ -45,17 +43,11 @@ class AppHeader(Widget):
                     Text("Cafedelia") + Text(" v" + version("cafedelia"), style="dim"),
                     id="cafedelia-title",
                 )
-            model_name_or_id = (
-                self.elia.runtime_config.selected_model.id
-                or self.elia.runtime_config.selected_model.name
-            )
-            model = get_model(model_name_or_id, self.elia.launch_config)
-            yield Label(self._get_selected_model_link_text(model), id="model-label")
+            yield Label(self._get_selected_model_link_text(), id="model-label")
 
-    def _get_selected_model_link_text(self, model: EliaChatModel) -> str:
-        return f"[@click=screen.options]{escape(model.display_name or model.name)}[/]"
+    def _get_selected_model_link_text(self) -> str:
+        return "Group · Claude Code × Codex"
 
     def _update_selected_model(self, model: EliaChatModel) -> None:
-        print(self.elia.runtime_config)
         model_label = self.query_one("#model-label", Label)
-        model_label.update(self._get_selected_model_link_text(model))
+        model_label.update(self._get_selected_model_link_text())

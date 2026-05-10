@@ -304,6 +304,45 @@ Chatbox {
 
 }
 
+RoomChat {
+  Static#room-header {
+    width: 100%;
+    height: auto;
+    padding: 1 2;
+    background: $background;
+    color: $text;
+  }
+
+  RoomPromptInput {
+    height: auto;
+    max-height: 50%;
+    padding: 0 1;
+    background: $background;
+    &.-submit-blocked {
+      border: round $error 50%;
+    }
+  }
+
+  ResponseStatus {
+    dock: top;
+    align-horizontal: right;
+    display: none;
+    layer: overlay;
+    height: 2;
+    width: auto;
+    margin-top: 1;
+    margin-right: 2;
+  }
+}
+
+RoomMessageWidget {
+  height: auto;
+  width: 1fr;
+  min-width: 12;
+  margin: 0 1;
+  padding: 0 1;
+}
+
 Footer {
   background: transparent;
 

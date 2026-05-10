@@ -100,3 +100,65 @@ class ChatDao(AsyncAttrs, SQLModel, table=True):
             chat.title = new_title
             session.add(chat)
             await session.commit()
+
+
+class RoomDao(AsyncAttrs, SQLModel, table=True):
+    __tablename__ = "room"
+
+    id: int | None = Field(default=None, primary_key=True)
+    title: str
+    created_at: datetime | None = Field(
+        sa_column=Column(DateTime(), server_default=func.now())
+    )
+    updated_at: datetime | None = Field(
+        sa_column=Column(DateTime(), server_default=func.now(), onupdate=func.now())
+    )
+    archived: bool = Field(default=False)
+
+
+class ActorDao(AsyncAttrs, SQLModel, table=True):
+    __tablename__ = "actor"
+
+    id: int | None = Field(default=None, primary_key=True)
+    key: str = Field(index=True, unique=True)
+    name: str
+    kind: str
+    command: str | None = None
+    created_at: datetime | None = Field(
+        sa_column=Column(DateTime(), server_default=func.now())
+    )
+
+
+class RoomMessageDao(AsyncAttrs, SQLModel, table=True):
+    __tablename__ = "room_message"
+
+    id: int | None = Field(default=None, primary_key=True)
+    room_id: int = Field(foreign_key="room.id", index=True)
+    actor_id: int = Field(foreign_key="actor.id", index=True)
+    role: str
+    event_type: str = Field(default="message", index=True)
+    content: str
+    timestamp: datetime | None = Field(
+        sa_column=Column(DateTime(), server_default=func.now())
+    )
+    raw_json: dict[Any, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    meta: dict[Any, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    parent_id: int | None = Field(
+        foreign_key="room_message.id", default=None, nullable=True
+    )
+
+
+class AgentRunDao(AsyncAttrs, SQLModel, table=True):
+    __tablename__ = "agent_run"
+
+    id: int | None = Field(default=None, primary_key=True)
+    room_id: int = Field(foreign_key="room.id", index=True)
+    actor_id: int = Field(foreign_key="actor.id", index=True)
+    status: str = Field(default="running", index=True)
+    command: str
+    started_at: datetime | None = Field(
+        sa_column=Column(DateTime(), server_default=func.now())
+    )
+    ended_at: datetime | None = None
+    exit_code: int | None = None
+    error: str | None = None

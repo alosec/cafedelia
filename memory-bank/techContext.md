@@ -1,313 +1,67 @@
 # Technical Context
 
-## Development Environment
+## Runtime
 
-### Project Structure
-```
-/home/alex/code/cafedelia/           # Elia fork for CLI provider integration
-├── elia_chat/                      # Main source code (inherited from Elia)
-│   ├── app.py                      # Main Textual application
-│   ├── config.py                   # Model/provider configuration (KEY EXTENSION POINT)
-│   ├── screens/                    # Screen management
-│   │   ├── home_screen.py          # Model selection + session browser
-│   │   ├── chat_screen.py          # API provider interface
-│   │   └── [NEW] session_screen.py # CLI provider interface
-│   ├── widgets/                    # UI components
-│   │   ├── chat_options.py         # Provider selection (KEY EXTENSION POINT)
-│   │   ├── chat.py                 # API provider display
-│   │   └── [NEW] tmux_session.py   # CLI provider display
-│   └── database/                   # SQLite persistence
-├── memory-bank/                    # Project documentation
-├── pyproject.toml                  # Python project configuration
-└── README.md                       # Project documentation
-```
+- Python 3.11+
+- Textual `0.79.1`
+- SQLModel + SQLite via `aiosqlite`
+- Rich rendering through Textual widgets
+- `uv` for local development and editable tool install
 
-### Technology Stack
+## CLI Entrypoints
 
-#### Core Framework (Inherited from Elia)
-- **Textual**: Python terminal UI framework
-  - Version: Latest stable (0.80+)
-  - Reactive, modern TUI with CSS-like styling
-  - Web deployment capability for future expansion
-  - Screen-based navigation and modal system
+`pyproject.toml` exposes:
 
-#### Language and Runtime
-- **Python 3.11+**: Required for modern async/await patterns
-- **Type Hints**: Full typing for maintainability
-- **Pydantic**: Configuration and data validation
-- **Rich**: Text rendering and markup (Textual dependency)
-
-#### Data and Persistence
-- **SQLite**: Database for chat history and session tracking
-  - Existing Elia schema for chat persistence
-  - Extension planned for CLI session intelligence
-- **TOML**: Configuration file format (inherited from Elia)
-- **JSON**: Session metadata and intelligence summaries
-
-#### External Integrations
-- **tmux**: Terminal multiplexer for session management
-  - Required for CLI provider functionality
-  - Session creation, attachment, persistence
-- **Claude Code**: Primary CLI provider integration
-  - Session discovery from ~/.config/claude-code/sessions/
-  - --resume functionality for session attachment
-- **Git**: Repository and worktree management
-  - Session context from git branch information
-  - Future: automated worktree coordination
-
-### Dependencies
-
-#### Core Dependencies (Inherited)
 ```toml
-[dependencies]
-textual = ">=0.80.0"           # Terminal UI framework
-pydantic = ">=2.0.0"           # Configuration validation
-rich = ">=13.0.0"              # Text rendering (Textual dependency)
-litellm = ">=1.0.0"            # LLM API abstraction (for API providers)
-```
-
-#### New Dependencies (CLI Provider Support)
-```toml
-# Additional dependencies for CLI provider functionality
-libtmux = ">=0.30.0"           # Tmux session management
-aiofiles = ">=24.1.0"          # Async file operations for session discovery
-psutil = ">=5.9.0"             # Process monitoring for session health
-```
-
-#### Development Dependencies
-```toml
-[dev-dependencies]
-pytest = ">=7.0.0"             # Testing framework
-black = ">=23.0.0"             # Code formatting
-ruff = ">=0.1.0"               # Linting and static analysis
-mypy = ">=1.0.0"               # Type checking
-```
-
-### Configuration System
-
-#### Model Configuration (Extended from Elia)
-```python
-# config.py - EliaChatModel extensions
-class EliaChatModel(BaseModel):
-    # Existing Elia fields...
-    name: str
-    provider: str | None = None
-    api_key: SecretStr | None = None
-    
-    # New CLI provider fields
-    provider_type: Literal["api", "cli"] = "api"
-    cli_command: str | None = None       # e.g. "claude code"
-    session_manager: str | None = None    # e.g. "tmux"
-    session_discovery: bool = False       # Auto-detect existing sessions
-```
-
-#### TOML Configuration Extensions
-```toml
-# ~/.config/cafedelia/config.toml
-[general]
-default_model = "claude-code-session"
-theme = "nebula"
-
-# Existing API providers (preserved)
-[[models]]
-id = "elia-claude-3-5-sonnet"
-name = "claude-3-5-sonnet-20240620"
-provider_type = "api"
-provider = "Anthropic"
-
-# New CLI providers
-[[models]]
-id = "claude-code-session"
-name = "Claude Code"
-provider_type = "cli"
-provider = "Claude Code"
-cli_command = "claude code"
-session_manager = "tmux"
-session_discovery = true
-
-[cli_providers.claude_code]
-session_prefix = "cafedelia-"
-max_concurrent_sessions = 5
-auto_resume = true
-```
-
-### Development Setup
-
-#### Installation and Environment
-```bash
-# Clone cafedelia repository
-git clone /path/to/cafedelia
-cd cafedelia
-
-# Create virtual environment (Python 3.11+)
-python -m venv .venv
-source .venv/bin/activate
-
-# Install dependencies
-pip install -e .
-
-# Install development dependencies
-pip install -e .[dev]
-```
-
-#### Development Prerequisites
-```bash
-# Required external tools
-sudo apt install tmux              # Session management
-pip install claude-code           # CLI provider to integrate
-
-# Optional but recommended
-sudo apt install git              # Repository management
-pip install pre-commit           # Git hooks for code quality
-```
-
-#### Running Cafedelia
-```bash
-# Development mode
-python -m elia_chat
-
-# Production installation
-cafedelia
-
-# With specific CLI provider
-cafedelia --provider claude-code
-
-# Attach to existing session
-cafedelia --resume session-abc123
-```
-
-### Development Patterns
-
-#### Async/Await for CLI Integration
-```python
-# All CLI provider operations use async patterns
-class SessionManager:
-    async def create_session(self, config: SessionConfig) -> TmuxSession:
-        # Non-blocking session creation
-        proc = await asyncio.create_subprocess_exec(
-            "tmux", "new-session", "-d", "-s", config.name, config.command
-        )
-        await proc.wait()
-        
-    async def discover_sessions(self) -> list[SessionInfo]:
-        # Non-blocking filesystem scanning
-        async with aiofiles.open(session_file) as f:
-            content = await f.read()
-```
-
-#### Type Safety and Validation
-```python
-# All configuration uses Pydantic models
-class SessionConfig(BaseModel):
-    session_id: str
-    provider: str
-    command: str
-    project_path: Path | None = None
-    
-class SessionInfo(BaseModel):
-    id: str
-    status: Literal["active", "inactive", "error"]
-    last_activity: datetime
-    project: str | None = None
-```
-
-#### Error Handling Patterns
-```python
-# Graceful degradation for CLI provider failures
-async def attach_session(self, session_id: str) -> TmuxSession | None:
-    try:
-        session = await self.tmux_manager.attach(session_id)
-        return session
-    except SessionNotFoundError:
-        self.log.warning(f"Session {session_id} not found")
-        return None
-    except TmuxError as e:
-        self.log.error(f"Tmux error: {e}")
-        # Fall back to API provider or show error screen
-        return None
-```
-
-### Build and Deployment
-
-#### Package Configuration
-```toml
-# pyproject.toml (inherited and extended)
-[build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[project]
-name = "cafedelia"
-description = "Terminal AI session management with CLI provider support"
-dependencies = [
-    "textual>=0.80.0",
-    "pydantic>=2.0.0", 
-    "libtmux>=0.30.0",
-    "aiofiles>=24.1.0",
-]
-
 [project.scripts]
-cafedelia = "elia_chat.__main__:main"
-
-[project.optional-dependencies]
-dev = ["pytest", "black", "ruff", "mypy"]
+cafedelia = "elia_chat.__main__:cli"
+cafidelia = "elia_chat.__main__:cli"
 ```
 
-#### Testing Strategy
-```python
-# Test structure for CLI provider functionality
-tests/
-├── unit/
-│   ├── test_session_discovery.py    # Session scanning logic
-│   ├── test_tmux_integration.py     # Tmux session management
-│   └── test_provider_routing.py     # API vs CLI provider routing
-├── integration/
-│   ├── test_claude_code_provider.py # End-to-end Claude Code integration
-│   └── test_session_lifecycle.py    # Session creation/attachment/cleanup
-└── fixtures/
-    ├── mock_sessions/               # Test session data
-    └── mock_tmux/                   # Tmux simulation
+Installed editable with:
+
+```bash
+uv tool install --force --editable /home/alex/code/cafedelia
 ```
 
-### Performance Considerations
+## Agent Commands
 
-#### Session Discovery Optimization
-- Cache session metadata to avoid repeated filesystem scans
-- Use file system watching for real-time session updates
-- Lazy loading of session details until user interaction
+Claude Code:
 
-#### Tmux Integration Efficiency
-- Connection pooling for tmux session management
-- Background session health monitoring
-- Efficient terminal output capture and processing
+```bash
+cnd -p --verbose --output-format stream-json
+cnd -p --verbose --output-format stream-json --resume <session_id>
+```
 
-#### Memory Management
-- Limit concurrent CLI sessions to prevent resource exhaustion
-- Clean up inactive sessions based on configurable timeout
-- Stream processing for large session outputs
+Codex:
 
-### Security Considerations
+```bash
+codex exec --json --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox
+codex exec resume --json --skip-git-repo-check --dangerously-bypass-approvals-and-sandbox <thread_id>
+```
 
-#### Session Isolation
-- Each CLI session runs in isolated tmux session
-- No cross-session file system access
-- Proper cleanup of temporary files and sessions
+`cnd` is expected to be a user shell alias/function that runs Claude Code with permission prompts bypassed. The adapter invokes it through `bash -ic` so the shell setup is available.
 
-#### Configuration Security
-- API keys stored using Pydantic SecretStr
-- CLI command validation to prevent injection
-- Sandboxed session execution where possible
+## Key Files
 
-### Future Technical Considerations
+- `elia_chat/__main__.py`: CLI commands and launch modes.
+- `elia_chat/app.py`: Textual app screen routing.
+- `elia_chat/database/models.py`: legacy chat tables plus room tables.
+- `elia_chat/rooms/manager.py`: async room persistence API.
+- `elia_chat/rooms/routing.py`: recipient parsing.
+- `elia_chat/agents/claude_code.py`: Claude subprocess adapter.
+- `elia_chat/agents/codex_cli.py`: Codex subprocess adapter.
+- `elia_chat/agents/parsers.py`: JSONL normalization.
+- `elia_chat/widgets/room_chat.py`: group room widget.
+- `elia_chat/widgets/room_message.py`: message panel rendering.
+- `elia_chat/widgets/chat_list.py`: merged room/chat history list.
+- `elia_chat/widgets/app_header.py`: group identity label.
 
-#### Scalability
-- Plugin architecture for additional CLI providers
-- Configurable resource limits per provider
-- Horizontal scaling for team collaboration features
+## Validation Commands
 
-#### Integration Expansion
-- VS Code extension for desktop integration
-- Web interface using Textual's web deployment
-- API for external tool integration
-
-This technical foundation builds on Elia's proven architecture while adding the CLI provider capabilities needed for comprehensive AI session management.
+```bash
+python3 -m compileall elia_chat
+uv run --frozen black --check elia_chat
+cafedelia --help
+cafidelia room --help
+```

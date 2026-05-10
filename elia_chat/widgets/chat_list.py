@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import datetime
 from dataclasses import dataclass
-from typing import Self, cast
+from typing import cast
 
 import humanize
 from rich.console import RenderResult, Console, ConsoleOptions
@@ -11,7 +11,6 @@ from rich.padding import Padding
 from rich.text import Text
 from textual import events, log, on
 from textual.binding import Binding
-from textual.geometry import Region
 from textual.message import Message
 from textual.widgets import OptionList
 from textual.widgets.option_list import Option
@@ -19,6 +18,23 @@ from textual.widgets.option_list import Option
 from elia_chat.chats_manager import ChatsManager
 from elia_chat.config import LaunchConfig
 from elia_chat.models import ChatData
+from elia_chat.rooms.manager import RoomManager
+
+
+@dataclass
+class RoomListData:
+    id: int
+    title: str
+    preview: str
+    update_time: datetime.datetime
+
+
+def normalized_update_time(timestamp: datetime.datetime | None) -> datetime.datetime:
+    if timestamp is None:
+        return datetime.datetime.now(datetime.timezone.utc)
+    if timestamp.tzinfo is None:
+        return timestamp.replace(tzinfo=datetime.timezone.utc)
+    return timestamp.astimezone(datetime.timezone.utc)
 
 
 @dataclass
@@ -56,6 +72,30 @@ class ChatListItem(Option):
         self.config = config
 
 
+@dataclass
+class RoomListItemRenderable:
+    room: RoomListData
+
+    def __rich_console__(
+        self, console: Console, options: ConsoleOptions
+    ) -> RenderResult:
+        now = datetime.datetime.now(datetime.timezone.utc)
+        delta = now - self.room.update_time
+        time_ago_text = Text(humanize.naturaltime(delta), style="dim i")
+        title = self.room.title or self.room.preview.replace("\n", " ")
+        subtitle = Text.from_markup("[dim]Group · Claude Code × Codex")
+        yield Padding(
+            Text.assemble(title, "\n", subtitle, "\n", time_ago_text),
+            pad=(0, 0, 0, 1),
+        )
+
+
+class RoomListItem(Option):
+    def __init__(self, room: RoomListData) -> None:
+        super().__init__(RoomListItemRenderable(room))
+        self.room = room
+
+
 class ChatList(OptionList):
     BINDINGS = [
         Binding(
@@ -86,6 +126,10 @@ class ChatList(OptionList):
     class ChatOpened(Message):
         chat: ChatData
 
+    @dataclass
+    class RoomOpened(Message):
+        room: RoomListData
+
     class CursorEscapingTop(Message):
         """Cursor attempting to move out-of-bounds at top of list."""
 
@@ -97,10 +141,11 @@ class ChatList(OptionList):
 
     @on(OptionList.OptionSelected)
     async def post_chat_opened(self, event: OptionList.OptionSelected) -> None:
-        assert isinstance(event.option, ChatListItem)
-        chat = event.option.chat
         await self.reload_and_refresh()
-        self.post_message(ChatList.ChatOpened(chat=chat))
+        if isinstance(event.option, RoomListItem):
+            self.post_message(ChatList.RoomOpened(room=event.option.room))
+        elif isinstance(event.option, ChatListItem):
+            self.post_message(ChatList.ChatOpened(chat=event.option.chat))
 
     @on(OptionList.OptionHighlighted)
     @on(events.Focus)
@@ -132,9 +177,36 @@ class ChatList(OptionList):
 
         self.refresh()
 
-    async def load_chat_list_items(self) -> list[ChatListItem]:
+    async def load_chat_list_items(self) -> list[RoomListItem | ChatListItem]:
+        rooms = await self.load_rooms()
         chats = await self.load_chats()
-        return [ChatListItem(chat, self.app.launch_config) for chat in chats]
+        return [
+            *[RoomListItem(room) for room in rooms],
+            *[ChatListItem(chat, self.app.launch_config) for chat in chats],
+        ]
+
+    async def load_rooms(self) -> list[RoomListData]:
+        rooms = []
+        for room in await RoomManager.list_rooms():
+            if room.id is None:
+                continue
+            messages = await RoomManager.get_messages(room.id)
+            last_message = messages[-1] if messages else None
+            preview = last_message.content if last_message else room.title
+            if len(preview) > 77:
+                preview = preview[:77] + "..."
+            update_time = normalized_update_time(
+                last_message.timestamp if last_message else room.updated_at
+            )
+            rooms.append(
+                RoomListData(
+                    id=room.id,
+                    title=room.title,
+                    preview=preview,
+                    update_time=update_time,
+                )
+            )
+        return rooms
 
     async def load_chats(self) -> list[ChatData]:
         all_chats = await ChatsManager.all_chats()
@@ -144,17 +216,24 @@ class ChatList(OptionList):
         if self.highlighted is None:
             return
 
-        item = cast(ChatListItem, self.get_option_at_index(self.highlighted))
+        item = cast(
+            RoomListItem | ChatListItem, self.get_option_at_index(self.highlighted)
+        )
         self.options.pop(self.highlighted)
         self.remove_option_at_index(self.highlighted)
 
-        chat_id = item.chat.id
-        await ChatsManager.archive_chat(chat_id)
+        if isinstance(item, RoomListItem):
+            await RoomManager.archive_room(item.room.id)
+            archived_title = item.room.title
+        else:
+            chat_id = item.chat.id
+            await ChatsManager.archive_chat(chat_id)
+            archived_title = item.chat.title or f"Chat {chat_id!r}"
 
         self.border_title = self.get_border_title()
         self.border_subtitle = self.get_border_subtitle()
         self.app.notify(
-            item.chat.title or f"Chat [b]{chat_id!r}[/] archived.",
+            archived_title,
             title="Chat archived",
         )
         self.refresh()

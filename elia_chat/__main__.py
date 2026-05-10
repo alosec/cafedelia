@@ -18,13 +18,16 @@ from elia_chat.config import LaunchConfig
 from elia_chat.database.import_chatgpt import import_chatgpt_data
 from elia_chat.database.database import create_database, sqlite_file_name
 from elia_chat.locations import config_file
+from elia_chat.rooms.manager import RoomManager
 
 console = Console()
+
 
 def create_db_if_not_exists() -> None:
     if not sqlite_file_name.exists():
         click.echo(f"Creating database at {sqlite_file_name!r}")
-        asyncio.run(create_database())
+    asyncio.run(create_database())
+
 
 def load_or_create_config_file() -> dict[str, Any]:
     config = config_file()
@@ -40,9 +43,11 @@ def load_or_create_config_file() -> dict[str, Any]:
 
     return file_config
 
+
 @click.group(cls=DefaultGroup, default="default", default_if_no_args=True)
 def cli() -> None:
     """Cafedelia - AI session management for terminal developers."""
+
 
 @cli.command()
 @click.argument("prompt", nargs=-1, type=str, required=False)
@@ -70,8 +75,78 @@ def default(prompt: tuple[str, ...], model: str, inline: bool) -> None:
         cli_config["default_model"] = model
 
     launch_config: dict[str, Any] = {**file_config, **cli_config}
-    app = Elia(LaunchConfig(**launch_config), startup_prompt=joined_prompt)
+    app = Elia(
+        LaunchConfig(**launch_config),
+        startup_prompt=joined_prompt,
+        startup_room=bool(joined_prompt),
+    )
     app.run(inline=inline)
+
+
+@cli.command()
+@click.argument("prompt", nargs=-1, type=str, required=False)
+@click.option("--title", type=str, default="Claude Code × Codex", help="Room title.")
+@click.option(
+    "-i",
+    "--inline",
+    is_flag=True,
+    help="Run in inline mode, without launching full TUI.",
+    default=False,
+)
+def room(prompt: tuple[str, ...], title: str, inline: bool) -> None:
+    """Open the Claude Code × Codex group chat room."""
+    create_db_if_not_exists()
+    file_config = load_or_create_config_file()
+    joined_prompt = " ".join(prompt)
+    app = Elia(
+        LaunchConfig(**file_config),
+        startup_prompt=joined_prompt,
+        startup_room=True,
+        startup_room_title=title,
+    )
+    app.run(inline=inline)
+
+
+async def _post_room_message(title: str, actor: str, prompt: str) -> int | None:
+    room = await RoomManager.get_or_create_room(title)
+    if room.id is None:
+        raise RuntimeError("Room was not assigned an ID.")
+    message = await RoomManager.add_message(
+        room.id,
+        actor,
+        prompt,
+        role="user" if actor == "user" else "assistant",
+        event_type="message",
+        meta={"source": "cafedelia-post"},
+    )
+    return message.id
+
+
+@cli.command()
+@click.argument("prompt", nargs=-1, type=str, required=True)
+@click.option("--title", type=str, default="Claude Code × Codex", help="Room title.")
+@click.option(
+    "--actor",
+    type=click.Choice(["user", "claude", "codex", "system"]),
+    default="user",
+    help="Actor posting the message.",
+)
+def post(prompt: tuple[str, ...], title: str, actor: str) -> None:
+    """Post a message into a Cafedelia room without opening the TUI."""
+    create_db_if_not_exists()
+    message_id = asyncio.run(_post_room_message(title, actor, " ".join(prompt)))
+    console.print(f"[green]Posted message {message_id} to room {title!r}[/]")
+
+
+@cli.command("send")
+@click.argument("prompt", nargs=-1, type=str, required=True)
+@click.option("--title", type=str, default="Claude Code × Codex", help="Room title.")
+def send_message(prompt: tuple[str, ...], title: str) -> None:
+    """Alias for posting a user message into a Cafedelia room."""
+    create_db_if_not_exists()
+    message_id = asyncio.run(_post_room_message(title, "user", " ".join(prompt)))
+    console.print(f"[green]Sent message {message_id} to room {title!r}[/]")
+
 
 @cli.command()
 def reset() -> None:
@@ -87,14 +162,16 @@ def reset() -> None:
     console.print(
         Padding(
             Text.from_markup(
-                dedent(f"""\
+                dedent(
+                    f"""\
 [u b red]Warning![/]
 
 [b red]This will delete all messages and chats.[/]
 
 You may wish to create a backup of \
 "[bold blue u]{str(sqlite_file_name.resolve().absolute())}[/]" before continuing.
-            """)
+            """
+                )
             ),
             pad=(1, 2),
         )
@@ -103,6 +180,7 @@ You may wish to create a backup of \
         sqlite_file_name.unlink(missing_ok=True)
         asyncio.run(create_database())
         console.print(f"♻️  Database reset @ {sqlite_file_name}")
+
 
 @cli.command("import")
 @click.argument(
@@ -120,6 +198,7 @@ def import_file_to_db(file: pathlib.Path) -> None:
     """
     asyncio.run(import_chatgpt_data(file=file))
     console.print(f"[green]ChatGPT data imported from {str(file)!r}")
+
 
 if __name__ == "__main__":
     cli()
